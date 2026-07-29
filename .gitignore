@@ -1,0 +1,54 @@
+# Build directories and generated artifacts
+/build/
+/Debug/
+/Release/
+/RelWithDebInfo/
+/MinSizeRel/
+/out/
+/mx.scratch/
+
+# Compiler and linker output
+*.o
+*.obj
+*.a
+*.lib
+*.elf
+*.axf
+*.hex
+*.bin
+*.map
+*.lst
+*.d
+*.su
+*.gcda
+*.gcno
+*.gcov
+
+# CMake generated files
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+compile_commands.json
+build.ninja
+.ninja_deps
+.ninja_log
+
+# Local IDE and editor state
+/.settings/
+/.vscode/
+/.idea/
+/.clangd
+/.mxproject
+*.launch
+*.user
+*.workspace
+
+# Operating-system and temporary files
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.tmp
+*.temp
+*.bak
+*.swp
+*~
