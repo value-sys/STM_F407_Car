@@ -10,28 +10,42 @@
 #include "debug_task.h"
 #include "encoder.h"
 #include "function.h"
+#include "GrayscaleSensor.h"
 #include "imu.h"
 #include "imu_task.h"
-#include "motor.h"
 #include "motor_control.h"
 #include "project_config.h"
+#include "vofa_firewater.h"
 
-/// @brief      使用当前工程VOFA_SendFloat封装两路电机状态打印
-/// @note       每个电机发送一帧，三个通道依次为：实际RPM、累计计数、PWM。
-///             第一帧是左电机DC_MOTOR1，第二帧是右电机DC_MOTOR2。
+/// @brief      同一FireWater帧发送两路电机的目标和实际转速
+/// @note       通道顺序为：左目标RPM、左实际RPM、右目标RPM、右实际RPM。
+/* Channels: M1 target RPM, M1 actual RPM, M1 target count, M1 actual count,
+ * M2 target RPM, M2 actual RPM, M2 target count, M2 actual count. */
 void vVofaSendMotorInfo(void)
 {
-    const stDcMotorDeviceParamTdf *pstMotor1 =
-        c_pstGetDcMotorDeviceParam(DC_MOTOR1);
-    const stDcMotorDeviceParamTdf *pstMotor2 =
-        c_pstGetDcMotorDeviceParam(DC_MOTOR2);
+    const stDcMotorEncoderDeviceParamTdf *pstEncoder1 =
+        c_pstGetEncoderDeviceParam(DC_MOTOR1);
+    const stDcMotorEncoderDeviceParamTdf *pstEncoder2 =
+        c_pstGetEncoderDeviceParam(DC_MOTOR2);
+    float afData[10] = {0.0f};
 
-    VOFA_SendFloat(g_fMotor1ActualRpm,
-        (float)c_pstGetEncoderDeviceParam(DC_MOTOR1)->stRunningParam.lCount,
-        (float)pstMotor1->stRunningParam.usPwmValue);
-    VOFA_SendFloat(g_fMotor2ActualRpm,
-        (float)c_pstGetEncoderDeviceParam(DC_MOTOR2)->stRunningParam.lCount,
-        (float)pstMotor2->stRunningParam.usPwmValue);
+    afData[0] = fMotorControlGetTargetRpm(DC_MOTOR1);
+    afData[1] = g_fMotor1ActualRpm;
+    afData[2] = (float)lMotorControlGetCascadeTargetCount(DC_MOTOR1);
+    if (pstEncoder1 != NULL)
+    {
+        afData[3] = (float)pstEncoder1->stRunningParam.lCount;
+    }
+    afData[4] = fMotorControlGetCascadeProgressRatio(DC_MOTOR1);
+    afData[5] = fMotorControlGetTargetRpm(DC_MOTOR2);
+    afData[6] = g_fMotor2ActualRpm;
+    afData[7] = (float)lMotorControlGetCascadeTargetCount(DC_MOTOR2);
+    if (pstEncoder2 != NULL)
+    {
+        afData[8] = (float)pstEncoder2->stRunningParam.lCount;
+    }
+    afData[9] = fMotorControlGetCascadeProgressRatio(DC_MOTOR2);
+    vVofaFireWaterSend(afData, 10U);
 }
 
 /// @brief      发送IMU航向角、Z轴角速度和Z轴角加速度
@@ -43,6 +57,21 @@ void vVofaSendImuInfo(void)
         fImuTaskGetAngularAccelerationZ());
 }
 
+/// @brief      同一FireWater帧发送灰度传感器D1~D8数字状态
+/// @note       通道顺序固定为D1到D8，输出值仅为0或1。
+void vVofaSendGrayscaleInfo(void)
+{
+    float afData[8];
+    uint8_t ucRaw = ucGrayscaleSensorGetDigital(GRAYSCALE1);
+    uint8_t ucIndex;
+
+    for (ucIndex = 0U; ucIndex < 8U; ucIndex++)
+    {
+        afData[ucIndex] = (float)((ucRaw >> ucIndex) & 0x01U);
+    }
+    vVofaFireWaterSend(afData, 8U);
+}
+
 void vVofaTask(void *pvParameters)
 {
     uint32_t ulWakeTick = osKernelGetTickCount();
@@ -50,10 +79,14 @@ void vVofaTask(void *pvParameters)
 
     for (;;)
     {
-        /* IMU调试模式发送IMU三通道，其余模式打印左右电机状态。 */
+        /* 每种调试模式只发送一种固定通道数的数据，避免VOFA帧错位。 */
         if (g_emDebugMode == emDebugModeImu)
         {
             vVofaSendImuInfo();
+        }
+        else if (g_emDebugMode == emDebugModeGrayscale)
+        {
+            vVofaSendGrayscaleInfo();
         }
         else
         {

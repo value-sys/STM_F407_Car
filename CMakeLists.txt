@@ -48,13 +48,18 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     User/Device/motor.c
     User/Device/encoder.c
     User/Device/pid_controller.c
+    User/Device/cascade_pid.c
     User/Device/motor_control.c
     User/Device/chassis.c
+    User/Device/GrayscaleSensor.c
+    User/Device/line_track.c
     User/Device/imu.c
     User/App/app_init.c
     User/App/debug_task.c
+    User/App/grayscale_task.c
     User/App/imu_task.c
     User/App/vofa_task.c
+    User/App/vofa_firewater.c
     User/function.c
 )
 

@@ -165,7 +165,9 @@ standard names. */
 #define USE_CUSTOM_SYSTICK_HANDLER_IMPLEMENTATION 1
 
 /* USER CODE BEGIN Defines */
-/* Section where parameter definitions can be added (for instance, to override default ones in FreeRTOS.h) */
+/* 控制任务必须在栈或堆不足时立即停机，避免电机继续使用失控前的PWM。 */
+#define configCHECK_FOR_STACK_OVERFLOW          2
+#define configUSE_MALLOC_FAILED_HOOK             1
 /* USER CODE END Defines */
 
 #endif /* FREERTOS_CONFIG_H */

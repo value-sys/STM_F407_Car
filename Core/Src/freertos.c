@@ -20,7 +20,9 @@
 #include "app_init.h"
 #include "chassis.h"
 #include "debug_task.h"
+#include "grayscale_task.h"
 #include "imu_task.h"
+#include "line_track.h"
 #include "motor_control.h"
 #include "project_config.h"
 #include "vofa_task.h"
@@ -33,7 +35,15 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+/*
+ * CMSIS-RTOS v2的stack_size单位为字节；参考工程的配置单位为
+ * StackType_t字数，因此在这里统一换算，避免直接照搬后缩小4倍。
+ */
+#define MOTOR_TASK_STACK_WORDS       640U
+#define CHASSIS_TASK_STACK_WORDS     512U
+#define IMU_TASK_STACK_WORDS         512U
+#define DEBUG_TASK_STACK_WORDS       512U
+#define VOFA_TASK_STACK_WORDS        640U
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -78,14 +88,14 @@ const osThreadAttr_t GrayTrace_Task_attributes = {
 osThreadId_t debugTaskHandle;
 const osThreadAttr_t debugTask_attributes = {
   .name = "debugTask",
-  .stack_size = 256 * 4,
+  .stack_size = 512 * 4,
   .priority = (osPriority_t) osPriorityLow,
 };
 /* Definitions for vofaTask06 */
 osThreadId_t vofaTask06Handle;
 const osThreadAttr_t vofaTask06_attributes = {
   .name = "vofaTask06",
-  .stack_size = 256 * 4,
+  .stack_size = 512 * 4,
   .priority = (osPriority_t) osPriorityLow,
 };
 
@@ -168,10 +178,57 @@ void MX_FREERTOS_Init(void) {
 void StartDefaultTask(void *argument)
 {
   /* USER CODE BEGIN StartDefaultTask */
-  /* Infinite loop */
-  for(;;)
+  uint32_t ulWakeTick = osKernelGetTickCount();
+
+  (void)argument;
+  for (;;)
   {
-    osDelay(1);
+    const stChassisDeviceParamTdf *pstChassis;
+
+    /*
+     * debug任务只写入vy/omega目标；本任务完成差速运动学换算，并把
+     * 左右轮RPM交给电机速度环。DC_MOTOR1为左轮，DC_MOTOR2为右轮。
+     */
+    if ((emChassisImuRotateGetState() == emChassisImuRotateRunning) ||
+        (g_emDebugMode == emDebugModeNone) ||
+        (g_emDebugMode == emDebugModeChassis) ||
+        (g_emDebugMode == emDebugModeImuRotate) ||
+        (g_emDebugMode == emDebugModeLineTrackImu) ||
+        (g_emDebugMode == emDebugModeCurveLineTrackImu) ||
+        (g_emDebugMode == emDebugModeGrayLineTrack) ||
+        (g_emDebugMode == emDebugModeCascadeRotate))
+    {
+      if (emChassisImuRotateGetState() == emChassisImuRotateRunning)
+      {
+        vChassisImuRotateUpdate();
+      }
+
+      if (g_emDebugMode == emDebugModeLineTrackImu)
+      {
+        /* 灰度负责位置外环，IMU角速度负责抑制弯道中的转动误差。 */
+        vLineTrackImuUpdateByTargetRpm(LINE_TRACK_TARGET_RPM);
+      }
+      else if (g_emDebugMode == emDebugModeCurveLineTrackImu)
+      {
+        /* 弯道丢线时由循迹模块保持最近一次有效线速度。 */
+        vLineTrackCurveImuUpdateByTargetRpm(LINE_TRACK_TARGET_RPM);
+      }
+      else if (g_emDebugMode == emDebugModeGrayLineTrack)
+      {
+        /* 纯灰度循迹不使用IMU，测试目标速度为50RPM。 */
+        vLineTrackUpdateByTargetRpm(LINE_TRACK_GRAY_ONLY_TARGET_RPM);
+      }
+
+      vChassisUpdate();
+      pstChassis = c_pstGetChassisDeviceParam();
+      vMotorControlSetTargetRpm(DC_MOTOR1,
+          pstChassis->stRunningParam.fLeftTargetSpeed);
+      vMotorControlSetTargetRpm(DC_MOTOR2,
+          pstChassis->stRunningParam.fRightTargetSpeed);
+    }
+
+    ulWakeTick += MOTOR_SAMPLE_TIME;
+    (void)osDelayUntil(ulWakeTick);
   }
   /* USER CODE END StartDefaultTask */
 }
@@ -186,10 +243,15 @@ void StartDefaultTask(void *argument)
 void MotorTest(void *argument)
 {
   /* USER CODE BEGIN MotorTest */
-  /* Infinite loop */
-  for(;;)
+  uint32_t ulWakeTick = osKernelGetTickCount();
+
+  (void)argument;
+  for (;;)
   {
-    osDelay(1);
+    /* 固定10ms更新两路定时器编码器测速、速度PID和PWM。 */
+    vMotorControlUpdate();
+    ulWakeTick += MOTOR_SAMPLE_TIME;
+    (void)osDelayUntil(ulWakeTick);
   }
   /* USER CODE END MotorTest */
 }
@@ -204,11 +266,8 @@ void MotorTest(void *argument)
 void ImuTask03(void *argument)
 {
   /* USER CODE BEGIN ImuTask03 */
-  /* Infinite loop */
-  for(;;)
-  {
-    osDelay(1);
-  }
+  /* IMU底层继续使用当前工程USART3中断，本任务只处理最新有效数据。 */
+  vImuTask(argument);
   /* USER CODE END ImuTask03 */
 }
 
@@ -222,11 +281,8 @@ void ImuTask03(void *argument)
 void GrayTrace(void *argument)
 {
   /* USER CODE BEGIN GrayTrace */
-  /* Infinite loop */
-  for(;;)
-  {
-    osDelay(1);
-  }
+  /* 每10ms读取一次8路数字灰度数据，循迹处理由后续功能单独调用。 */
+  vGrayscaleTask(argument);
   /* USER CODE END GrayTrace */
 }
 
@@ -240,11 +296,8 @@ void GrayTrace(void *argument)
 void debug(void *argument)
 {
   /* USER CODE BEGIN debug */
-  /* Infinite loop */
-  for(;;)
-  {
-    osDelay(1);
-  }
+  /* 默认进入底盘测试：停车保护3秒后，以100RPM对应线速度前进。 */
+  vDebugTask(argument);
   /* USER CODE END debug */
 }
 
@@ -258,11 +311,8 @@ void debug(void *argument)
 void vofa06(void *argument)
 {
   /* USER CODE BEGIN vofa06 */
-  /* Infinite loop */
-  for(;;)
-  {
-    osDelay(1);
-  }
+  /* 复用当前工程VOFA_SendFloat，每100ms打印一次两路电机状态。 */
+  vVofaTask(argument);
   /* USER CODE END vofa06 */
 }
 

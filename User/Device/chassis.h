@@ -18,6 +18,13 @@ typedef enum
     emChassisImuRotateNoImu
 } emChassisImuRotateStateTdf;
 
+typedef enum
+{
+    emChassisCascadeRotateIdle = 0U,
+    emChassisCascadeRotateRunning,
+    emChassisCascadeRotateCompleted
+} emChassisCascadeRotateStateTdf;
+
 typedef struct
 {
     float fWheelRadius;                 ///< 车轮半径(mm)
@@ -64,6 +71,7 @@ void vChassisSetSpeed(float fVy, float fOmega);
 void vChassisUpdate(void);
 void vChassisStop(void);
 void vChassisMove(float fVy);
+void vChassisMoveRpm(float fWheelRpm);
 void vChassisRotate(float fOmega);
 void vChassisPivotRotate(float fOmega);
 
@@ -79,5 +87,20 @@ void vChassisImuRotateUpdate(void);
 void vChassisImuRotateCancel(void);
 
 emChassisImuRotateStateTdf emChassisImuRotateGetState(void);
+
+/**
+  * @brief      按给定旋转半径和角度启动电机位置串级PID旋转
+  * @param      fRadiusMm 旋转中心到车体中心的距离，0表示原地旋转，单位mm
+  * @param      fAngleDeg 旋转角度，正负方向沿用底盘omega约定，单位度
+  */
+void vChassisCascadeRotateStart(float fRadiusMm, float fAngleDeg);
+/**
+  * @brief      按给定半径、角度和车体角速度启动串级PID旋转
+  * @param      fAngularSpeedRadS 前馈车体角速度，单位rad/s
+  */
+void vChassisCascadeRotateStartWithSpeed(float fRadiusMm, float fAngleDeg,
+    float fAngularSpeedRadS);
+void vChassisCascadeRotateCancel(void);
+emChassisCascadeRotateStateTdf emChassisCascadeRotateGetState(void);
 
 #endif

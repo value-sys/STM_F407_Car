@@ -18,7 +18,12 @@ typedef enum
     emDebugModeEncoder,              ///< 保持停止，仅观察编码器测速
     emDebugModeImu,                  ///< 保持停止，通过VOFA观察IMU数据
     emDebugModeChassis,              ///< 上电保护延时后持续执行底盘前进测试
-    emDebugModeImuRotate             ///< 执行IMU双环定角旋转测试
+    emDebugModeImuRotate,            ///< 执行IMU双环定角旋转测试
+    emDebugModeGrayscale,             ///< 保持停止，通过VOFA观察8路灰度数字量
+    emDebugModeLineTrackImu,         ///< 灰度位置外环+IMU角速度内环循迹
+    emDebugModeCurveLineTrackImu,    ///< 弯道循迹，丢线保持丢线前速度
+    emDebugModeGrayLineTrack,        ///< 纯灰度循迹，不使用IMU
+    emDebugModeCascadeRotate         ///< 位置-速度串级PID旋转测试
 } emDebugModeTdf;
 
 extern volatile emDebugModeTdf g_emDebugMode;
@@ -29,7 +34,10 @@ extern volatile uint16_t g_usDebugMotor2Pwm;
 extern volatile float g_fDebugChassisVy;
 extern volatile float g_fDebugChassisOmega;
 extern volatile float g_fDebugImuRotateAngleDeg;
-/// 0表示停车保护阶段，1表示正在前进。
+extern volatile float g_fDebugCascadeRotateRadiusMm;
+extern volatile float g_fDebugCascadeRotateAngleDeg;
+extern volatile float g_fDebugCascadeRotateOmegaRadS;
+/// 0表示前进前停车，1表示前进，2表示后退前停车，3表示后退。
 extern volatile uint8_t g_ucDebugChassisTestState;
 
 void vDebugTask(void *pvParameters);
