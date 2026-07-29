@@ -24,6 +24,7 @@
 #include "motor_control.h"
 #include "project_config.h"
 #include "vofa_task.h"
+#include "ui_task.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -143,7 +144,7 @@ void MX_FREERTOS_Init(void) {
   GrayTrace_TaskHandle = osThreadNew(GrayTrace, NULL, &GrayTrace_Task_attributes);
 
   /* creation of debugTask */
-  debugTaskHandle = osThreadNew(debug, NULL, &debugTask_attributes);
+  debugTaskHandle = osThreadNew(vDebugTask, NULL, &debugTask_attributes);
 
   /* creation of vofaTask06 */
   vofaTask06Handle = osThreadNew(vofa06, NULL, &vofaTask06_attributes);
@@ -171,7 +172,8 @@ void StartDefaultTask(void *argument)
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+    vUiTaskUpdate();
+    osDelay(2);
   }
   /* USER CODE END StartDefaultTask */
 }

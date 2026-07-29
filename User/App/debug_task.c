@@ -11,6 +11,7 @@
 #include "motor.h"
 #include "motor_control.h"
 #include "project_config.h"
+#include "ui_task.h"
 
 /* 当前固件用于底盘前进测试：上电先停车保护，再进入直线前进。 */
 volatile emDebugModeTdf g_emDebugMode = emDebugModeChassis;
@@ -59,7 +60,22 @@ void vDebugTask(void *pvParameters)
     (void)pvParameters;
     for (;;)
     {
-        emDebugModeTdf emMode = g_emDebugMode;
+        if (ucUiRunEnabled() == 0U)
+        {
+            vDebugModeExit();
+            ulWakeTick += MOTOR_SAMPLE_TIME;
+            (void)osDelayUntil(ulWakeTick);
+            continue;
+        }
+
+        /*
+         * The existing chassis debug controller is the only runnable mode at
+         * this stage. Other contest modes remain stopped until their
+         * controllers are connected to the vision feedback.
+         */
+        emDebugModeTdf emMode = eUiGetMode() == UI_MODE_LINE_LAP
+            ? emDebugModeChassis
+            : emDebugModeNone;
 
         if (emMode != emLastMode)
         {

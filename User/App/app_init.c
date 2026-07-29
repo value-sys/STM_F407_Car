@@ -12,6 +12,7 @@
 #include "motor.h"
 #include "motor_control.h"
 #include "project_config.h"
+#include "ui_task.h"
 
 /// @brief      初始化应用层使用的全部功能模块
 /// @note       电机、编码器和IMU沿用当前STM32 HAL驱动；灰度暂不初始化。
@@ -91,4 +92,5 @@ void vAppModuleInit(void)
      */
     vImuDeviceInit(&stImu, IMU_1);
     vImuSendYawZeroCmd(IMU_1);
+    vUiInit();
 }

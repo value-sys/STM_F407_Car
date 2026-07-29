@@ -4,16 +4,22 @@ set(CMAKE_SYSTEM_PROCESSOR          arm)
 set(CMAKE_C_COMPILER_ID GNU)
 set(CMAKE_CXX_COMPILER_ID GNU)
 
-# Some default GCC settings
-# arm-none-eabi- must be part of path environment
-set(TOOLCHAIN_PREFIX                arm-none-eabi-)
+# Prefer the ARM GNU Toolchain installation found on this machine. If the
+# directory is moved, CMake can still fall back to a PATH-installed toolchain.
+set(ARM_GNU_TOOLCHAIN_BIN
+    "C:/Program Files (x86)/Arm/GNU Toolchain mingw-w64-i686-arm-none-eabi/bin")
+if(EXISTS "${ARM_GNU_TOOLCHAIN_BIN}/arm-none-eabi-gcc.exe")
+    set(TOOLCHAIN_PREFIX "${ARM_GNU_TOOLCHAIN_BIN}/arm-none-eabi-")
+else()
+    set(TOOLCHAIN_PREFIX "arm-none-eabi-")
+endif()
 
-set(CMAKE_C_COMPILER                ${TOOLCHAIN_PREFIX}gcc)
-set(CMAKE_ASM_COMPILER              ${CMAKE_C_COMPILER})
-set(CMAKE_CXX_COMPILER              ${TOOLCHAIN_PREFIX}g++)
-set(CMAKE_LINKER                    ${TOOLCHAIN_PREFIX}g++)
-set(CMAKE_OBJCOPY                   ${TOOLCHAIN_PREFIX}objcopy)
-set(CMAKE_SIZE                      ${TOOLCHAIN_PREFIX}size)
+set(CMAKE_C_COMPILER                "${TOOLCHAIN_PREFIX}gcc.exe")
+set(CMAKE_ASM_COMPILER              "${CMAKE_C_COMPILER}")
+set(CMAKE_CXX_COMPILER              "${TOOLCHAIN_PREFIX}g++.exe")
+set(CMAKE_LINKER                    "${TOOLCHAIN_PREFIX}g++.exe")
+set(CMAKE_OBJCOPY                   "${TOOLCHAIN_PREFIX}objcopy.exe")
+set(CMAKE_SIZE                      "${TOOLCHAIN_PREFIX}size.exe")
 
 set(CMAKE_EXECUTABLE_SUFFIX_ASM     ".elf")
 set(CMAKE_EXECUTABLE_SUFFIX_C       ".elf")

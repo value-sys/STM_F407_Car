@@ -11,6 +11,9 @@ cmake_minimum_required(VERSION 3.22)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS ON)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS ON)
 
 
 # Define the build type
@@ -29,7 +32,7 @@ project(${CMAKE_PROJECT_NAME})
 message("Build type: " ${CMAKE_BUILD_TYPE})
 
 # Enable CMake support for ASM and C languages
-enable_language(C ASM)
+enable_language(C CXX ASM)
 
 # Create an executable object type
 add_executable(${CMAKE_PROJECT_NAME})
@@ -55,7 +58,14 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     User/App/debug_task.c
     User/App/imu_task.c
     User/App/vofa_task.c
+    User/App/ui_task.c
+    Module/motor/qd4310/Qd4310Motor.cpp
+    Module/motor/qd4310/qd4310.c
+    Module/motor/zdt_y42/Y42Protocol.cpp
+    Module/motor/zdt_y42/Y42Motor.cpp
     User/function.c
+    User/Device/oled_ssd1306.c
+    User/Device/key.c
 )
 
 # Add include paths
@@ -63,7 +73,9 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined include paths
     ${CMAKE_SOURCE_DIR}/User
     ${CMAKE_SOURCE_DIR}/User/App
-    ${CMAKE_SOURCE_DIR}/User/Device       
+    ${CMAKE_SOURCE_DIR}/User/Device
+    ${CMAKE_SOURCE_DIR}/Module/motor/qd4310
+    ${CMAKE_SOURCE_DIR}/Module/motor/zdt_y42
 )
 
 # Add project symbols (macros)
