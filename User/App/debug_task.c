@@ -12,6 +12,7 @@
 #include "motor_control.h"
 #include "line_track.h"
 #include "project_config.h"
+#include "ui_task.h"
 
 /* 当前固件默认用于位置-速度串级PID旋转测试。 */
 volatile emDebugModeTdf g_emDebugMode = emDebugModeCascadeRotate;
@@ -110,7 +111,22 @@ void vDebugTask(void *pvParameters)
     (void)pvParameters;
     for (;;)
     {
-        emDebugModeTdf emMode = g_emDebugMode;
+        if (ucUiRunEnabled() == 0U)
+        {
+            vDebugModeExit();
+            ulWakeTick += MOTOR_SAMPLE_TIME;
+            (void)osDelayUntil(ulWakeTick);
+            continue;
+        }
+
+        /*
+         * The existing chassis debug controller is the only runnable mode at
+         * this stage. Other contest modes remain stopped until their
+         * controllers are connected to the vision feedback.
+         */
+        emDebugModeTdf emMode = eUiGetMode() == UI_MODE_LINE_LAP
+            ? emDebugModeChassis
+            : emDebugModeNone;
 
         if (emMode != emLastMode)
         {

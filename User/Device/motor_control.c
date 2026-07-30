@@ -10,6 +10,7 @@
 #include "encoder.h"
 #include "pid_controller.h"
 #include "project_config.h"
+#include "ui_task.h"
 #include <math.h>
 #include <stddef.h>
 #include <string.h>
@@ -207,6 +208,12 @@ void vMotorControlUpdate(void)
         stRunningParam.fCurrentSpeed;
     g_fMotor2ActualRpm = c_pstGetEncoderDeviceParam(DC_MOTOR2)->
         stRunningParam.fCurrentSpeed;
+
+    if (ucUiRunEnabled() == 0U)
+    {
+        vMotorControlStop();
+        return;
+    }
 
     if (s_ucControlEnable == 0U)
     {

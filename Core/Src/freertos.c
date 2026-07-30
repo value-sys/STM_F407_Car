@@ -26,6 +26,8 @@
 #include "motor_control.h"
 #include "project_config.h"
 #include "vofa_task.h"
+#include "ui_task.h"
+#include "vision_task.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -183,6 +185,8 @@ void StartDefaultTask(void *argument)
   (void)argument;
   for (;;)
   {
+    vVisionTaskUpdate();
+    vUiTaskUpdate();
     const stChassisDeviceParamTdf *pstChassis;
 
     /*

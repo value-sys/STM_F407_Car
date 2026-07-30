@@ -14,6 +14,8 @@
 #include "motor.h"
 #include "motor_control.h"
 #include "project_config.h"
+#include "ui_task.h"
+#include "vision_task.h"
 
 /// @brief      初始化应用层使用的全部功能模块
 /// @note       GPIO、TIM、UART底层均由CubeMX初始化，本函数只绑定应用设备参数。
@@ -128,4 +130,6 @@ void vAppModuleInit(void)
      */
     vImuDeviceInit(&stImu, IMU_1);
     vImuSendYawZeroCmd(IMU_1);
+    vVisionInit();
+    vUiInit();
 }
