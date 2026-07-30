@@ -10,6 +10,7 @@
 
 void vVofaSendMotorInfo(void);
 void vVofaSendImuInfo(void);
+void vVofaSendGrayscaleInfo(void);
 void vVofaTask(void *pvParameters);
 
 #endif

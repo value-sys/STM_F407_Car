@@ -85,12 +85,10 @@ void Error_Handler(void);
 #define ENCODER_1_BD12_GPIO_Port GPIOD
 #define ENCODER_1_A_Pin GPIO_PIN_13
 #define ENCODER_1_A_GPIO_Port GPIOD
-#define AD0_Pin GPIO_PIN_0
-#define AD0_GPIO_Port GPIOD
-#define AD1_Pin GPIO_PIN_1
-#define AD1_GPIO_Port GPIOD
-#define AD2_Pin GPIO_PIN_2
-#define AD2_GPIO_Port GPIOD
+#define CLK_Pin GPIO_PIN_0
+#define CLK_GPIO_Port GPIOD
+#define DAT_Pin GPIO_PIN_1
+#define DAT_GPIO_Port GPIOD
 #define ENCODER_1_AB3_Pin GPIO_PIN_3
 #define ENCODER_1_AB3_GPIO_Port GPIOB
 

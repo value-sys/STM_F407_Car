@@ -7,9 +7,12 @@
   */
 
 #include "chassis.h"
+#include "encoder.h"
 #include "imu.h"
+#include "motor_control.h"
 #include "pid_controller.h"
 #include "project_config.h"
+#include <math.h>
 #include <stddef.h>
 #include <string.h>
 
@@ -20,6 +23,7 @@
 static stChassisDeviceParamTdf s_stChassisDeviceParam;
 static PID_t s_stImuTurnAnglePid;
 static PID_t s_stImuTurnRatePid;
+static emChassisCascadeRotateStateTdf s_emCascadeRotateState;
 
 static float fChassisAbs(float fValue)
 {
@@ -53,6 +57,40 @@ static float fChassisWrapYaw(float fAngle)
     return fAngle;
 }
 
+static int32_t lChassisRpmDurationToEncoderCount(
+    emDcMotorDevNumTdf emMotor, float fRpm, float fDurationS)
+{
+    const stDcMotorEncoderDeviceParamTdf *pstEncoder =
+        c_pstGetEncoderDeviceParam(emMotor);
+    float fCountsPerRevolution;
+
+    if ((pstEncoder == NULL) ||
+        (pstEncoder->stStaticParam.usLines == 0U) ||
+        (pstEncoder->stStaticParam.usReductionRatio == 0U) ||
+        (pstEncoder->stStaticParam.ucMode == 0U))
+    {
+        return 0;
+    }
+
+    fCountsPerRevolution = (float)pstEncoder->stStaticParam.usLines *
+        (float)pstEncoder->stStaticParam.usReductionRatio *
+        (float)pstEncoder->stStaticParam.ucMode;
+    return (int32_t)lroundf(fRpm * fDurationS / 60.0f *
+        fCountsPerRevolution);
+}
+
+/// @brief      应用单电机目标编码器计数修正比例
+/// @note       比例无效时回退到1.0，避免误配置导致目标计数不移动。
+static int32_t lChassisScaleTargetCount(int32_t lMoveCount,
+    float fCountRatio)
+{
+    if (fCountRatio <= 0.0f)
+    {
+        fCountRatio = 1.0f;
+    }
+    return (int32_t)lroundf((float)lMoveCount * fCountRatio);
+}
+
 static void vChassisPidInit(PID_t *pstPid, float fKp, float fKi,
     float fKd, float fMaxOut)
 {
@@ -84,6 +122,7 @@ void vChassisDeviceInit(const stChassisStaticParamTdf *pstInit)
         0, sizeof(stChassisRunningParamTdf));
     s_stChassisDeviceParam.stRunningParam.emImuRotateState =
         emChassisImuRotateIdle;
+    s_emCascadeRotateState = emChassisCascadeRotateIdle;
 
     /* 航向角外环输出目标偏航角速度，角速度内环输出底盘omega。 */
     vChassisPidInit(&s_stImuTurnAnglePid,
@@ -98,10 +137,18 @@ void vChassisDeviceInit(const stChassisStaticParamTdf *pstInit)
 
 /// @brief      设置底盘目标速度
 /// @note       只更新目标，不进行PWM操作，可由其他任务安全地调用。
-void vChassisSetSpeed(float fVy, float fOmega)
+static void vChassisSetSpeedRaw(float fVy, float fOmega)
 {
     s_stChassisDeviceParam.stRunningParam.vy = fVy;
     s_stChassisDeviceParam.stRunningParam.omega = fOmega;
+}
+
+void vChassisSetSpeed(float fVy, float fOmega)
+{
+#if (CHASSIS_FORWARD_REVERSE != 0U)
+    fVy = -fVy;
+#endif
+    vChassisSetSpeedRaw(fVy, fOmega);
 }
 
 /// @brief      将底盘目标换算为左右轮RPM
@@ -146,6 +193,26 @@ void vChassisMove(float fVy)
     vChassisSetSpeed(fVy, 0.0f);
 }
 
+/// @brief      按车轮RPM设置底盘直行速度
+/// @param      fWheelRpm 左右轮目标转速，正值沿当前底盘前进方向
+/// @note       仍通过vChassisMove处理底盘前进方向反转和右轮镜像方向。
+void vChassisMoveRpm(float fWheelRpm)
+{
+    const stChassisStaticParamTdf *pstStatic =
+        &s_stChassisDeviceParam.stStaticParam;
+    float fVy;
+
+    if (pstStatic->fWheelRadius <= 0.0f)
+    {
+        vChassisStop();
+        return;
+    }
+
+    fVy = fWheelRpm * (2.0f * CHASSIS_PI * pstStatic->fWheelRadius) /
+        60.0f;
+    vChassisMove(fVy);
+}
+
 void vChassisRotate(float fOmega)
 {
     vChassisSetSpeed(0.0f, fOmega);
@@ -156,7 +223,8 @@ void vChassisRotate(float fOmega)
 void vChassisPivotRotate(float fOmega)
 {
     float fAbsOmega = (fOmega >= 0.0f) ? fOmega : -fOmega;
-    vChassisSetSpeed(fAbsOmega *
+    /* 支点旋转的vy是运动学内部量，不经过底盘前进方向修正。 */
+    vChassisSetSpeedRaw(fAbsOmega *
         s_stChassisDeviceParam.stStaticParam.fWheelBase * 0.5f, fOmega);
 }
 
@@ -276,4 +344,114 @@ void vChassisImuRotateCancel(void)
 emChassisImuRotateStateTdf emChassisImuRotateGetState(void)
 {
     return s_stChassisDeviceParam.stRunningParam.emImuRotateState;
+}
+
+void vChassisCascadeRotateStart(float fRadiusMm, float fAngleDeg)
+{
+    vChassisCascadeRotateStartWithSpeed(fRadiusMm, fAngleDeg,
+        CASCADE_ROTATE_FEEDFORWARD_OMEGA_RAD_S);
+}
+
+void vChassisCascadeRotateStartWithSpeed(float fRadiusMm, float fAngleDeg,
+    float fAngularSpeedRadS)
+{
+    const stChassisStaticParamTdf *pstStatic =
+        &s_stChassisDeviceParam.stStaticParam;
+    const stDcMotorEncoderDeviceParamTdf *pstEncoder1;
+    const stDcMotorEncoderDeviceParamTdf *pstEncoder2;
+    float fAngleRad = fAngleDeg * CHASSIS_DEG_TO_RAD;
+    float fOmega;
+    float fVy;
+    float fDurationS;
+    float fMotor1FeedforwardRpm;
+    float fMotor2FeedforwardRpm;
+    int32_t lMotor1TargetCount;
+    int32_t lMotor2TargetCount;
+
+    if (fAngularSpeedRadS < 0.0f)
+    {
+        fAngularSpeedRadS = -fAngularSpeedRadS;
+    }
+    if (fAngularSpeedRadS <= 0.0f)
+    {
+        fAngularSpeedRadS = CASCADE_ROTATE_FEEDFORWARD_OMEGA_RAD_S;
+    }
+
+    /*
+     * 根据实测转弯半径修正运动学输入：
+     * 修正后的半径 = 期望半径 * (当前指令半径 / 实测半径)。
+     * 系数为1.0时保持原始解算；半径偏大时将该系数设为小于1。
+     */
+    if (CASCADE_ROTATE_RADIUS_COMMAND_TO_MEASURED_RATIO > 0.0f)
+    {
+        fRadiusMm *= CASCADE_ROTATE_RADIUS_COMMAND_TO_MEASURED_RATIO;
+    }
+
+    vMotorControlCancelCascadePosition();
+    if ((pstStatic->fWheelRadius <= 0.0f) ||
+        (pstStatic->fWheelBase <= 0.0f))
+    {
+        s_emCascadeRotateState = emChassisCascadeRotateIdle;
+        vMotorControlStop();
+        return;
+    }
+
+    /*
+     * 先用当前底盘运动学解算前馈轮速：当omega=1rad/s时，
+     * vy=R，因此调用同一套vChassisUpdate即可自动处理前进方向
+     * 反转和右电机镜像符号，避免直接按几何距离给错电机方向。
+     */
+    fOmega = (fAngleRad >= 0.0f) ? fAngularSpeedRadS :
+        -fAngularSpeedRadS;
+    fVy = fRadiusMm * fOmega;
+    vChassisSetSpeed(fVy, fOmega);
+    vChassisUpdate();
+    fMotor1FeedforwardRpm =
+        s_stChassisDeviceParam.stRunningParam.fLeftTargetSpeed;
+    fMotor2FeedforwardRpm =
+        s_stChassisDeviceParam.stRunningParam.fRightTargetSpeed;
+    vChassisStop();
+    fDurationS = (fAngularSpeedRadS > 0.0f) ?
+        fChassisAbs(fAngleRad) / fAngularSpeedRadS : 0.0f;
+
+    pstEncoder1 = c_pstGetEncoderDeviceParam(DC_MOTOR1);
+    pstEncoder2 = c_pstGetEncoderDeviceParam(DC_MOTOR2);
+    if ((pstEncoder1 == NULL) || (pstEncoder2 == NULL))
+    {
+        s_emCascadeRotateState = emChassisCascadeRotateIdle;
+        vMotorControlStop();
+        return;
+    }
+
+    lMotor1TargetCount = pstEncoder1->stRunningParam.lCount +
+        lChassisScaleTargetCount(
+            lChassisRpmDurationToEncoderCount(DC_MOTOR1,
+                fMotor1FeedforwardRpm, fDurationS),
+            CASCADE_ROTATE_MOTOR1_TARGET_COUNT_RATIO);
+    lMotor2TargetCount = pstEncoder2->stRunningParam.lCount +
+        lChassisScaleTargetCount(
+            lChassisRpmDurationToEncoderCount(DC_MOTOR2,
+                fMotor2FeedforwardRpm, fDurationS),
+            CASCADE_ROTATE_MOTOR2_TARGET_COUNT_RATIO);
+    vMotorControlStartCascadePositionWithFeedforward(lMotor1TargetCount,
+        lMotor2TargetCount, fMotor1FeedforwardRpm,
+        fMotor2FeedforwardRpm, CASCADE_ROTATE_TARGET_SPEED_MAX_RPM);
+    s_emCascadeRotateState = emChassisCascadeRotateRunning;
+}
+
+void vChassisCascadeRotateCancel(void)
+{
+    vMotorControlCancelCascadePosition();
+    vMotorControlStop();
+    s_emCascadeRotateState = emChassisCascadeRotateIdle;
+}
+
+emChassisCascadeRotateStateTdf emChassisCascadeRotateGetState(void)
+{
+    if ((s_emCascadeRotateState == emChassisCascadeRotateRunning) &&
+        (ucMotorControlCascadePositionIsComplete() != 0U))
+    {
+        s_emCascadeRotateState = emChassisCascadeRotateCompleted;
+    }
+    return s_emCascadeRotateState;
 }

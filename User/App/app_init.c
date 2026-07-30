@@ -8,7 +8,9 @@
 #include "app_init.h"
 #include "chassis.h"
 #include "encoder.h"
+#include "GrayscaleSensor.h"
 #include "imu.h"
+#include "line_track.h"
 #include "motor.h"
 #include "motor_control.h"
 #include "project_config.h"
@@ -16,7 +18,7 @@
 #include "vision_task.h"
 
 /// @brief      初始化应用层使用的全部功能模块
-/// @note       电机、编码器和IMU沿用当前STM32 HAL驱动；灰度暂不初始化。
+/// @note       GPIO、TIM、UART底层均由CubeMX初始化，本函数只绑定应用设备参数。
 void vAppModuleInit(void)
 {
     const stDcMotorStaticParamTdf stMotor1 = {
@@ -77,6 +79,39 @@ void vAppModuleInit(void)
     const stImuStaticParamTdf stImu = {
         .pstUartHandle = IMU1_UART_HANDLE,
     };
+    const stGrayscaleSensorStaticParamTdf stGrayscale = {
+        .pstClkGpioBase = GRAYSCALE1_CLK_PORT,
+        .usClkGpioPin = GRAYSCALE1_CLK_PIN,
+        .pstDataGpioBase = GRAYSCALE1_DATA_PORT,
+        .usDataGpioPin = GRAYSCALE1_DATA_PIN,
+        .ucDirectionReverse = GRAYSCALE1_DIRECTION_REVERSE,
+    };
+    const stLineTrackStaticParamTdf stLineTrack = {
+        .fBaseSpeed = LINE_TRACK_BASE_SPEED,
+        .fCorrectionKp = LINE_TRACK_CORRECTION_KP,
+        .fMaxCorrectionOmega = LINE_TRACK_MAX_CORRECTION_OMEGA,
+        .fLostSpeedScale = LINE_TRACK_LOST_SPEED_SCALE,
+        .fStraightGrayPidKp = LINE_TRACK_STRAIGHT_GRAY_PID_KP,
+        .fStraightGrayPidKi = LINE_TRACK_STRAIGHT_GRAY_PID_KI,
+        .fStraightGrayPidKd = LINE_TRACK_STRAIGHT_GRAY_PID_KD,
+        .fCurveGrayPidKp = LINE_TRACK_CURVE_GRAY_PID_KP,
+        .fCurveGrayPidKi = LINE_TRACK_CURVE_GRAY_PID_KI,
+        .fCurveGrayPidKd = LINE_TRACK_CURVE_GRAY_PID_KD,
+        .fYawAnglePidKp = IMU_STRAIGHT_ANGLE_PID_KP,
+        .fYawAnglePidKi = IMU_STRAIGHT_ANGLE_PID_KI,
+        .fYawAnglePidKd = IMU_STRAIGHT_ANGLE_PID_KD,
+        .fStraightYawRatePidKp = LINE_TRACK_STRAIGHT_YAW_RATE_PID_KP,
+        .fStraightYawRatePidKi = LINE_TRACK_STRAIGHT_YAW_RATE_PID_KI,
+        .fStraightYawRatePidKd = LINE_TRACK_STRAIGHT_YAW_RATE_PID_KD,
+        .fCurveYawRatePidKp = LINE_TRACK_CURVE_YAW_RATE_PID_KP,
+        .fCurveYawRatePidKi = LINE_TRACK_CURVE_YAW_RATE_PID_KI,
+        .fCurveYawRatePidKd = LINE_TRACK_CURVE_YAW_RATE_PID_KD,
+        .fStraightMaxTargetYawRate =
+            LINE_TRACK_STRAIGHT_MAX_TARGET_YAW_RATE,
+        .fCurveMaxTargetYawRate = LINE_TRACK_CURVE_MAX_TARGET_YAW_RATE,
+        .fOuterControlWeight = LINE_TRACK_OUTER_CONTROL_WEIGHT,
+        .fImuFeedbackWeight = LINE_TRACK_IMU_FEEDBACK_WEIGHT,
+    };
 
     /* 电机控制链的顺序必须保持：PWM -> 编码器 -> PID -> 底盘。 */
     vDcMotorDeviceInit(&stMotor1, DC_MOTOR1);
@@ -85,6 +120,8 @@ void vAppModuleInit(void)
     vEncoderInit(&stEncoder2, DC_MOTOR2);
     vMotorControlInit();
     vChassisDeviceInit(&stChassis);
+    vGrayscaleSensorDeviceInit(&stGrayscale, GRAYSCALE1);
+    vLineTrackDeviceInit(&stLineTrack);
 
     /*
      * IMU继续使用当前工程USART3的HAL单字节接收中断。设备初始化会启动
