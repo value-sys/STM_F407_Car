@@ -28,6 +28,7 @@
 #include "vofa_task.h"
 #include "ui_task.h"
 #include "vision_task.h"
+#include "qd4310_test.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -100,6 +101,13 @@ const osThreadAttr_t vofaTask06_attributes = {
   .stack_size = 512 * 4,
   .priority = (osPriority_t) osPriorityLow,
 };
+/* Definitions for QD4310 test task */
+osThreadId_t Qd4310TestTaskHandle;
+const osThreadAttr_t Qd4310TestTask_attributes = {
+  .name = "Qd4310TestTask",
+  .stack_size = 512 * 4,
+  .priority = (osPriority_t) osPriorityLow,
+};
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
@@ -159,6 +167,10 @@ void MX_FREERTOS_Init(void) {
 
   /* creation of vofaTask06 */
   vofaTask06Handle = osThreadNew(vofa06, NULL, &vofaTask06_attributes);
+
+  /* creation of QD4310 test task */
+  Qd4310TestTaskHandle = osThreadNew(vQd4310TestTask, NULL,
+      &Qd4310TestTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */

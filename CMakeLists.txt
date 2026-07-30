@@ -65,6 +65,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     User/App/vofa_firewater.c
     User/App/ui_task.c
     User/App/vision_task.c
+    User/App/qd4310_test.cpp
     User/function.c
     User/Device/oled_ssd1306.c
     User/Device/key.c
