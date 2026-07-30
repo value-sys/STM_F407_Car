@@ -14,13 +14,13 @@
 #include <stddef.h>
 #include <string.h>
 
-#define LINE_TRACK_POSITION_MAX       35.0f
+#define LINE_TRACK_POSITION_MAX       100.0f
 #define LINE_TRACK_PI                 3.14159265358979323846f
 #define LINE_TRACK_DEG_TO_RAD         (LINE_TRACK_PI / 180.0f)
 
 /* D1~D4位于左侧，D5~D8位于右侧。 */
 static const int8_t s_acLinePosition[8] =
-    {-35, -25, -15, -5, 5, 15, 25, 35};
+    {-80, -50, -15, -10, 10, 15, 50, 80};
 
 static stLineTrackDeviceParamTdf s_stLineTrackDeviceParam;
 static PID_t s_stStraightGrayPid;

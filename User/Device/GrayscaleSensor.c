@@ -34,11 +34,7 @@ static uint8_t ucGrayscaleReverseBits(uint8_t ucValue)
     return (uint8_t)((ucValue << 4U) | (ucValue >> 4U));
 }
 
-/**
-  * @brief      将传感器串行位序转换为D1~D8标准位序
-  * @param      ucRaw 原始位序为D1,D8,D7,D6,D5,D4,D3,D2
-  * @return     bit0~bit7依次对应D1~D8的数字量
-  */
+/* Map the observed serial bit order to physical channels 1 through 8. */
 static uint8_t ucGrayscaleMapChannelOrder(uint8_t ucRaw)
 {
     uint8_t ucMapped = (uint8_t)(ucRaw & 0x01U);

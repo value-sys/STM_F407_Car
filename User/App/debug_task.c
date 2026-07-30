@@ -15,7 +15,7 @@
 #include "ui_task.h"
 
 /* 当前固件默认用于位置-速度串级PID旋转测试。 */
-volatile emDebugModeTdf g_emDebugMode = emDebugModeCascadeRotate;
+volatile emDebugModeTdf g_emDebugMode = emDebugModeGrayLineTrack;
 volatile float g_fDebugMotor1TargetRpm = 100.0f;
 volatile float g_fDebugMotor2TargetRpm = 100.0f;
 volatile uint16_t g_usDebugMotor1Pwm = 550U;
@@ -113,20 +113,18 @@ void vDebugTask(void *pvParameters)
     {
         if (ucUiRunEnabled() == 0U)
         {
+            g_emDebugMode = emDebugModeNone;
             vDebugModeExit();
             ulWakeTick += MOTOR_SAMPLE_TIME;
             (void)osDelayUntil(ulWakeTick);
             continue;
         }
 
-        /*
-         * The existing chassis debug controller is the only runnable mode at
-         * this stage. Other contest modes remain stopped until their
-         * controllers are connected to the vision feedback.
-         */
+        /* KEY1 starts grayscale-only line tracking in LINE 1 CIRCLE mode. */
         emDebugModeTdf emMode = eUiGetMode() == UI_MODE_LINE_LAP
-            ? emDebugModeChassis
+            ? emDebugModeGrayLineTrack
             : emDebugModeNone;
+        g_emDebugMode = emMode;
 
         if (emMode != emLastMode)
         {
