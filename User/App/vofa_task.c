@@ -63,11 +63,12 @@ void vVofaSendGrayscaleInfo(void)
 {
     float afData[8];
     uint8_t ucRaw = ucGrayscaleSensorGetDigital(GRAYSCALE1);
+    uint8_t ucBlackMask = (uint8_t)(~ucRaw);
     uint8_t ucIndex;
 
     for (ucIndex = 0U; ucIndex < 8U; ucIndex++)
     {
-        afData[ucIndex] = (float)((ucRaw >> ucIndex) & 0x01U);
+        afData[ucIndex] = (float)((ucBlackMask >> ucIndex) & 0x01U);
     }
     vVofaFireWaterSend(afData, 8U);
 }
@@ -79,7 +80,6 @@ void vVofaTask(void *pvParameters)
 
     for (;;)
     {
-        /* 每种调试模式只发送一种固定通道数的数据，避免VOFA帧错位。 */
         if (g_emDebugMode == emDebugModeImu)
         {
             vVofaSendImuInfo();

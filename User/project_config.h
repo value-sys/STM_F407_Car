@@ -165,8 +165,8 @@
 #define LINE_TRACK_TARGET_RPM                           100.0f  /* 灰度+IMU直线/弯道测试目标转速 */
 #define LINE_TRACK_GRAY_ONLY_TARGET_RPM                 50.0f   /* 纯灰度循迹测试目标转速 */
 #define LINE_TRACK_BASE_SPEED                           314.1593f /* 默认线速度，单位mm/s */
-#define LINE_TRACK_CORRECTION_KP                        2.0f    /* 传统灰度比例修正系数 */
-#define LINE_TRACK_MAX_CORRECTION_OMEGA                 2.0f    /* 底盘循迹角速度限幅，单位rad/s */
+#define LINE_TRACK_CORRECTION_KP                        5.0f    /* 传统灰度比例修正系数 */
+#define LINE_TRACK_MAX_CORRECTION_OMEGA                 5.0f    /* 底盘循迹角速度限幅，单位rad/s */
 #define LINE_TRACK_LOST_SPEED_SCALE                     0.5f    /* 传统灰度丢线时的速度比例 */
 
 /* 直线循迹灰度位置外环，输出目标偏航角速度(°/s)。 */
@@ -175,7 +175,7 @@
 #define LINE_TRACK_STRAIGHT_GRAY_PID_KD                 0.0f    /* 直线灰度外环微分系数 */
 
 /* 弯道循迹灰度位置外环，单独调参。 */
-#define LINE_TRACK_CURVE_GRAY_PID_KP                    200.0f  /* 弯道灰度外环比例系数 */
+#define LINE_TRACK_CURVE_GRAY_PID_KP                    0.1f  /* 弯道灰度外环比例系数 */
 #define LINE_TRACK_CURVE_GRAY_PID_KI                    0.0f    /* 弯道灰度外环积分系数 */
 #define LINE_TRACK_CURVE_GRAY_PID_KD                    0.0f    /* 弯道灰度外环微分系数 */
 
