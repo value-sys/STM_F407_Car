@@ -59,6 +59,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     User/App/imu_task.c
     User/App/vofa_task.c
     User/App/ui_task.c
+    User/App/vision_task.c
     Module/motor/qd4310/Qd4310Motor.cpp
     Module/motor/qd4310/qd4310.c
     Module/motor/zdt_y42/Y42Protocol.cpp
@@ -66,6 +67,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     User/function.c
     User/Device/oled_ssd1306.c
     User/Device/key.c
+    User/Device/vision_protocol.c
 )
 
 # Add include paths
