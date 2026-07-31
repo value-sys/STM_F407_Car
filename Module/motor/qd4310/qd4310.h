@@ -31,6 +31,8 @@ typedef struct {
     float angle_rad;
     float current_a;
     UART_HandleTypeDef *huart;
+    uint8_t last_tx_frame[5];
+    uint32_t tx_count;
 } qd4310_t;
 
 #define QD4310_PI 3.14159265358979323846f
@@ -43,6 +45,9 @@ typedef struct {
 #define QD4310_MIN_STEP_ANGLE_RAD (-QD4310_TWO_PI)
 
 void qd4310_init(qd4310_t *motor, UART_HandleTypeDef *huart, uint8_t id);
+HAL_StatusTypeDef qd4310_send_only(qd4310_t *motor,
+                                   qd4310_command_t cmd,
+                                   int16_t value);
 HAL_StatusTypeDef qd4310_send_raw(qd4310_t *motor, qd4310_command_t cmd, int16_t value);
 void qd4310_update(qd4310_t *motor, const uint8_t feedback[8]);
 
@@ -51,6 +56,9 @@ HAL_StatusTypeDef qd4310_disable(qd4310_t *motor);
 HAL_StatusTypeDef qd4310_reboot(qd4310_t *motor);
 HAL_StatusTypeDef qd4310_set_zero_pos(qd4310_t *motor);
 HAL_StatusTypeDef qd4310_set_angle(qd4310_t *motor, float angle_rad);
+HAL_StatusTypeDef qd4310_set_step_angle_only(qd4310_t *motor,
+                                             float step_angle_rad);
+HAL_StatusTypeDef qd4310_set_speed_only(qd4310_t *motor, float speed_rpm);
 HAL_StatusTypeDef qd4310_set_step_angle(qd4310_t *motor, float step_angle_rad);
 HAL_StatusTypeDef qd4310_set_speed(qd4310_t *motor, float speed_rpm);
 HAL_StatusTypeDef qd4310_set_low_speed(qd4310_t *motor, float speed_rpm);

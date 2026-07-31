@@ -106,7 +106,7 @@ osThreadId_t Qd4310TestTaskHandle;
 const osThreadAttr_t Qd4310TestTask_attributes = {
   .name = "Qd4310TestTask",
   .stack_size = 512 * 4,
-  .priority = (osPriority_t) osPriorityLow,
+  .priority = (osPriority_t) osPriorityAboveNormal,
 };
 
 /* Private function prototypes -----------------------------------------------*/
@@ -165,8 +165,8 @@ void MX_FREERTOS_Init(void) {
   /* creation of debugTask */
   debugTaskHandle = osThreadNew(debug, NULL, &debugTask_attributes);
 
-  /* creation of vofaTask06 */
-  vofaTask06Handle = osThreadNew(vofa06, NULL, &vofaTask06_attributes);
+  /* VOFA is temporarily disabled because USART1 is reserved for vision. */
+  vofaTask06Handle = NULL;
 
   /* creation of QD4310 test task */
   Qd4310TestTaskHandle = osThreadNew(vQd4310TestTask, NULL,

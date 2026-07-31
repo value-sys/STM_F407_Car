@@ -5,6 +5,10 @@
 
 #include "vision_protocol.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef enum
 {
     VISION_STATE_WAITING = 0,
@@ -33,6 +37,7 @@ extern volatile uint8_t g_vision_debug_confidence;
 extern volatile uint16_t g_vision_debug_sequence;
 extern volatile uint32_t g_vision_debug_timestamp_ms;
 extern volatile uint32_t g_vision_debug_receive_tick_ms;
+extern volatile uint32_t g_vision_debug_receive_count;
 extern volatile uint32_t g_vision_debug_frame_ok_count;
 extern volatile uint32_t g_vision_debug_crc_error_count;
 extern volatile uint32_t g_vision_debug_format_error_count;
@@ -46,5 +51,9 @@ uint8_t ucVisionGetLatest(stVisionBallData *data);
 float fVisionGetBallSpeedMmPerS(void);
 eVisionState eVisionGetState(void);
 void vVisionGetDiagnostics(stVisionDiagnostics *diagnostics);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

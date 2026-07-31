@@ -10,18 +10,20 @@
 
 #define VISION_FRAME_LENGTH       17U
 #define VISION_PAYLOAD_LENGTH     10U
-#define VISION_CONFIDENCE_MIN     60U
-#define VISION_POSITION_MIN_01MM  (-1200)
-#define VISION_POSITION_MAX_01MM  (1200)
+#define VISION_CONFIDENCE_MIN     10U
+/* Absolute pipe coordinate: 1 mm to 250 mm, unit 1 mm. */
+#define VISION_POSITION_MIN_MM    (1)
+#define VISION_POSITION_MAX_MM    (250)
 
 typedef struct
 {
     uint16_t sequence;
-    int16_t ball_position_01mm;
+    int16_t ball_position_mm;
     uint8_t valid;
     uint8_t confidence;
     uint32_t timestamp_ms;
     uint32_t receive_tick_ms;
+    uint32_t receive_count;
 } stVisionBallData;
 
 typedef struct

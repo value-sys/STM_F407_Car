@@ -8,6 +8,7 @@
 #include "key.h"
 #include "motor_control.h"
 #include "oled_ssd1306.h"
+#include "qd4310_test.h"
 
 static uint8_t g_ui_run_enabled;
 static eUiModeTdf g_ui_mode;
@@ -15,6 +16,9 @@ static uint8_t g_ui_dirty;
 static uint32_t g_ui_start_tick;
 static uint32_t g_ui_elapsed_tenths;
 static uint32_t g_ui_rendered_tenths;
+
+volatile uint8_t g_ui_debug_key2_raw;
+volatile uint8_t g_ui_debug_key2_stable;
 
 static void ui_stop_motion(void)
 {
@@ -56,7 +60,13 @@ static void ui_render(void)
     const uint32_t tenths = g_ui_elapsed_tenths % 10U;
 
     if (g_ui_run_enabled != 0U) {
-        state = g_ui_mode == UI_MODE_LINE_LAP ? "RUNNING" : "NO CTRL";
+        if (g_ui_mode == UI_MODE_LINE_LAP) {
+            state = "RUNNING";
+        } else if (g_ui_mode == UI_MODE_STATIC_POSITION) {
+            state = "BALANCE";
+        } else {
+            state = "NO CTRL";
+        }
     } else if (g_ui_mode != UI_MODE_STANDBY) {
         state = "READY";
     }
@@ -86,6 +96,9 @@ void vUiInit(void)
     g_ui_start_tick = 0U;
     g_ui_elapsed_tenths = 0U;
     g_ui_rendered_tenths = 0U;
+    g_ui_debug_key2_raw = 0U;
+    g_ui_debug_key2_stable = 0U;
+    g_qd4310_test_motion_authorized = 0U;
     if (OLED_Init(&hi2c1, 0x3CU) == HAL_OK) {
         ui_render();
         g_ui_dirty = 0U;
@@ -95,17 +108,24 @@ void vUiInit(void)
 void vUiTaskUpdate(void)
 {
     const uint8_t events = Key_Scan();
+    g_ui_debug_key2_raw = Key_IsDownRaw(1U);
+    g_ui_debug_key2_stable = Key_IsDown(1U);
 
     /*
      * KEY2 has priority while held. This keeps stop behavior reliable even
      * if the first debounced edge is lost during a noisy transition.
      */
     /* The stop key bypasses debounce so motion is removed immediately. */
-    if (Key_IsDownRaw(1U) != 0U || Key_IsDown(1U) != 0U) {
+    if (g_ui_debug_key2_raw != 0U || g_ui_debug_key2_stable != 0U) {
         vUiStop();
     } else if ((events & KEY_EVENT_1) != 0U) {
         if (g_ui_mode == UI_MODE_STANDBY) {
             g_ui_mode = UI_MODE_LINE_LAP;
+        }
+        if (g_ui_mode == UI_MODE_STATIC_POSITION) {
+            /* Static-position mode owns the QD4310 run request. */
+            g_qd4310_test_manual_mode = 0U;
+            g_qd4310_test_motion_authorized = 1U;
         }
         g_ui_start_tick = osKernelGetTickCount();
         g_ui_elapsed_tenths = 0U;
@@ -115,12 +135,14 @@ void vUiTaskUpdate(void)
     } else if ((events & KEY_EVENT_2) != 0U) {
         vUiStop();
     } else if ((events & KEY_EVENT_3) != 0U) {
+        vUiStop();
         g_ui_mode = (eUiModeTdf)((g_ui_mode + 1U) % UI_MODE_COUNT);
         g_ui_run_enabled = 0U;
         g_ui_elapsed_tenths = 0U;
         g_ui_rendered_tenths = 0U;
         g_ui_dirty = 1U;
     } else if ((events & KEY_EVENT_4) != 0U) {
+        vUiStop();
         g_ui_mode = UI_MODE_STANDBY;
         g_ui_run_enabled = 0U;
         g_ui_elapsed_tenths = 0U;
@@ -143,6 +165,7 @@ void vUiTaskUpdate(void)
 
 void vUiStop(void)
 {
+    vQd4310TestRequestStop();
     if (g_ui_run_enabled != 0U) {
         g_ui_elapsed_tenths = ui_elapsed_tenths_now();
         g_ui_run_enabled = 0U;
