@@ -198,6 +198,16 @@
 #define LINE_TRACK_SENSOR_TURN_SIGN                      1.0f
 #define LINE_TRACK_IMU_TURN_SIGN                         1.0f
 
+/* ============================== ABCD路线状态机参数 ============================== */
+
+#define LINE_ROUTE_STRAIGHT_TARGET_RPM                  100.0f /* AB、CD直线段目标转速 */
+#define LINE_ROUTE_CURVE_TARGET_RPM                      50.0f /* BC、DA弯道目标转速 */
+#define LINE_ROUTE_STRAIGHT_DISTANCE_MM                 1400.0f /* AB、CD直线段切换距离，单位mm */
+#define LINE_ROUTE_CURVE_ANGLE_DEG                       180.0f /* BC、DA半圆弯道累计转角，单位度 */
+#define LINE_ROUTE_DA_FINISH_SEARCH_ANGLE_DEG            160.0f /* DA累计到该角度后开始识别停止线 */
+#define LINE_ROUTE_FINISH_BLACK_COUNT                     3U    /* 最后停止线至少覆盖的灰度通道数 */
+#define LINE_ROUTE_FINISH_CONFIRM_CYCLES                  1U    /* 停止线连续确认周期数，1次为10ms */
+
 /* ============================== 调试与串口监视参数 ============================== */
 
 #define DEBUG_CHASSIS_TEST_STOP_TIME_MS                 3000U   /* 底盘测试切换前停车时间，单位ms */

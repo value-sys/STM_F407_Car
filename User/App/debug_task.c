@@ -10,6 +10,7 @@
 #include "cmsis_os2.h"
 #include "motor.h"
 #include "motor_control.h"
+#include "line_route.h"
 #include "line_track.h"
 #include "project_config.h"
 #include "ui_task.h"
@@ -36,6 +37,7 @@ static void vDebugModeExit(void)
     /* 先取消可能仍在运行的定角旋转，再清空速度环历史输出。 */
     vChassisImuRotateCancel();
     vChassisCascadeRotateCancel();
+    vLineRouteStop();
     vLineTrackStop();
     vMotorControlSetEnable(1U);
     vMotorControlStop();
@@ -113,16 +115,17 @@ void vDebugTask(void *pvParameters)
     {
         if (ucUiRunEnabled() == 0U)
         {
-            g_emDebugMode = emDebugModeNone;
+            /* 未启动循迹时停车，并先通过VOFA检查D1~D8状态。 */
+            g_emDebugMode = emDebugModeGrayscale;
             vDebugModeExit();
             ulWakeTick += MOTOR_SAMPLE_TIME;
             (void)osDelayUntil(ulWakeTick);
             continue;
         }
 
-        /* KEY1 starts grayscale-only line tracking in LINE 1 CIRCLE mode. */
+        /* KEY1启动ABCD整圈路线状态机。 */
         emDebugModeTdf emMode = eUiGetMode() == UI_MODE_LINE_LAP
-            ? emDebugModeGrayLineTrack
+            ? emDebugModeLineRoute
             : emDebugModeNone;
         g_emDebugMode = emMode;
 
@@ -142,6 +145,10 @@ void vDebugTask(void *pvParameters)
                     g_fDebugCascadeRotateRadiusMm,
                     g_fDebugCascadeRotateAngleDeg,
                     g_fDebugCascadeRotateOmegaRadS);
+            }
+            else if (emMode == emDebugModeLineRoute)
+            {
+                vLineRouteStart();
             }
             emLastMode = emMode;
         }
@@ -170,6 +177,9 @@ void vDebugTask(void *pvParameters)
                 break;
             case emDebugModeGrayLineTrack:
                 vLineTrackStart();
+                break;
+            case emDebugModeLineRoute:
+                /* 路段控制和标记切换由10ms底盘任务执行。 */
                 break;
             case emDebugModeCascadeRotate:
                 /* 旋转目标在进入模式时计算一次，完成后由串级PID自动停车。 */

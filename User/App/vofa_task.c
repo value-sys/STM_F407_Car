@@ -8,7 +8,6 @@
 #include "vofa_task.h"
 #include "cmsis_os2.h"
 #include "debug_task.h"
-#include "encoder.h"
 #include "function.h"
 #include "GrayscaleSensor.h"
 #include "imu.h"
@@ -19,33 +18,15 @@
 
 /// @brief      同一FireWater帧发送两路电机的目标和实际转速
 /// @note       通道顺序为：左目标RPM、左实际RPM、右目标RPM、右实际RPM。
-/* Channels: M1 target RPM, M1 actual RPM, M1 target count, M1 actual count,
- * M2 target RPM, M2 actual RPM, M2 target count, M2 actual count. */
 void vVofaSendMotorInfo(void)
 {
-    const stDcMotorEncoderDeviceParamTdf *pstEncoder1 =
-        c_pstGetEncoderDeviceParam(DC_MOTOR1);
-    const stDcMotorEncoderDeviceParamTdf *pstEncoder2 =
-        c_pstGetEncoderDeviceParam(DC_MOTOR2);
-    float afData[10] = {0.0f};
+    float afData[4] = {0.0f};
 
     afData[0] = fMotorControlGetTargetRpm(DC_MOTOR1);
     afData[1] = g_fMotor1ActualRpm;
-    afData[2] = (float)lMotorControlGetCascadeTargetCount(DC_MOTOR1);
-    if (pstEncoder1 != NULL)
-    {
-        afData[3] = (float)pstEncoder1->stRunningParam.lCount;
-    }
-    afData[4] = fMotorControlGetCascadeProgressRatio(DC_MOTOR1);
-    afData[5] = fMotorControlGetTargetRpm(DC_MOTOR2);
-    afData[6] = g_fMotor2ActualRpm;
-    afData[7] = (float)lMotorControlGetCascadeTargetCount(DC_MOTOR2);
-    if (pstEncoder2 != NULL)
-    {
-        afData[8] = (float)pstEncoder2->stRunningParam.lCount;
-    }
-    afData[9] = fMotorControlGetCascadeProgressRatio(DC_MOTOR2);
-    vVofaFireWaterSend(afData, 10U);
+    afData[2] = fMotorControlGetTargetRpm(DC_MOTOR2);
+    afData[3] = g_fMotor2ActualRpm;
+    vVofaFireWaterSend(afData, 4U);
 }
 
 /// @brief      发送IMU航向角、Z轴角速度和Z轴角加速度
@@ -84,7 +65,11 @@ void vVofaTask(void *pvParameters)
         {
             vVofaSendImuInfo();
         }
-        else if (g_emDebugMode == emDebugModeGrayscale)
+        else if ((g_emDebugMode == emDebugModeGrayscale) ||
+                 (g_emDebugMode == emDebugModeGrayLineTrack) ||
+                 (g_emDebugMode == emDebugModeLineTrackImu) ||
+                 (g_emDebugMode == emDebugModeCurveLineTrackImu) ||
+                 (g_emDebugMode == emDebugModeLineRoute))
         {
             vVofaSendGrayscaleInfo();
         }
