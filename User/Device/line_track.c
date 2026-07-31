@@ -20,7 +20,7 @@
 
 /* D1最靠近左电机，D8最靠近右电机，D4/D5位于中间。 */
 static const int8_t s_acLinePosition[8] =
-    {-50, -25, -15, 15, 25, 50, 80, -80};
+    {-70, -50, -30, -10, 10, 30, 50, 70};
 
 static stLineTrackDeviceParamTdf s_stLineTrackDeviceParam;
 static PID_t s_stStraightGrayPid;
