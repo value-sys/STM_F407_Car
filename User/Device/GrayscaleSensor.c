@@ -139,6 +139,8 @@ void vGrayscaleSensorTask(emGrayscaleSensorDevNumTdf emDevNum)
     {
         ucRaw = ucGrayscaleReverseBits(ucRaw);
     }
+    /* 整体循环左移一位：D1<-D8，D2<-D1，...，D8<-D7。 */
+    //ucRaw = (uint8_t)((ucRaw << 1U) | (ucRaw >> 7U));
     pstDevice->stRunningParam.ucDigitalOutput = ucRaw;
     ucBlackMask = (uint8_t)(~ucRaw);
     g_ucGrayscaleD1 = (uint8_t)((ucBlackMask >> 0U) & 0x01U);

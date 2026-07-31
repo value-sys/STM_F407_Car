@@ -29,6 +29,7 @@ extern volatile uint8_t g_ucLineRouteMarkerActive;
 extern volatile uint8_t g_ucLineRouteMarkerCount;
 extern volatile float g_fLineRouteSegmentDistanceMm;
 extern volatile float g_fLineRouteCurveAngleDeg;
+extern volatile float g_fLineRouteCommandRpm;
 
 void vLineRouteStart(void);
 void vLineRouteStop(void);

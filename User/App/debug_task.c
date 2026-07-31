@@ -11,6 +11,7 @@
 #include "motor.h"
 #include "motor_control.h"
 #include "line_route.h"
+#include "line_ab_curve_test.h"
 #include "line_track.h"
 #include "project_config.h"
 #include "ui_task.h"
@@ -38,6 +39,7 @@ static void vDebugModeExit(void)
     vChassisImuRotateCancel();
     vChassisCascadeRotateCancel();
     vLineRouteStop();
+    vLineAbCurveStop();
     vLineTrackStop();
     vMotorControlSetEnable(1U);
     vMotorControlStop();
@@ -118,15 +120,30 @@ void vDebugTask(void *pvParameters)
             /* 未启动循迹时停车，并先通过VOFA检查D1~D8状态。 */
             g_emDebugMode = emDebugModeGrayscale;
             vDebugModeExit();
+            emLastMode = emDebugModeNone;
             ulWakeTick += MOTOR_SAMPLE_TIME;
             (void)osDelayUntil(ulWakeTick);
             continue;
         }
 
-        /* KEY1启动ABCD整圈路线状态机。 */
-        emDebugModeTdf emMode = eUiGetMode() == UI_MODE_LINE_LAP
-            ? emDebugModeLineRoute
-            : emDebugModeNone;
+        /* KEY1启动OLED当前选择的测试模式。 */
+        emDebugModeTdf emMode;
+        if (eUiGetMode() == UI_MODE_GRAY_TRACK_TEST)
+        {
+            emMode = emDebugModeGrayLineTrack;
+        }
+        else if (eUiGetMode() == UI_MODE_LINE_LAP)
+        {
+            emMode = emDebugModeLineRoute;
+        }
+        else if (eUiGetMode() == UI_MODE_AB_CURVE_TEST)
+        {
+            emMode = emDebugModeAbCurveTest;
+        }
+        else
+        {
+            emMode = emDebugModeNone;
+        }
         g_emDebugMode = emMode;
 
         if (emMode != emLastMode)
@@ -149,6 +166,10 @@ void vDebugTask(void *pvParameters)
             else if (emMode == emDebugModeLineRoute)
             {
                 vLineRouteStart();
+            }
+            else if (emMode == emDebugModeAbCurveTest)
+            {
+                vLineAbCurveStart();
             }
             emLastMode = emMode;
         }
@@ -180,6 +201,9 @@ void vDebugTask(void *pvParameters)
                 break;
             case emDebugModeLineRoute:
                 /* 路段控制和标记切换由10ms底盘任务执行。 */
+                break;
+            case emDebugModeAbCurveTest:
+                /* AB直线和短弯控制由10ms底盘任务执行。 */
                 break;
             case emDebugModeCascadeRotate:
                 /* 旋转目标在进入模式时计算一次，完成后由串级PID自动停车。 */
