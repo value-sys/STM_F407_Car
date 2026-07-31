@@ -200,6 +200,15 @@ HAL_StatusTypeDef qd4310_set_angle(qd4310_t *motor, float angle_rad)
     return qd4310_send_raw(motor, QD4310_CMD_ANGLE, (int16_t)raw);
 }
 
+HAL_StatusTypeDef qd4310_set_angle_only(qd4310_t *motor, float angle_rad)
+{
+    uint16_t raw;
+
+    angle_rad = qd4310_clamp(angle_rad, 0.0f, QD4310_TWO_PI);
+    raw = (uint16_t)((angle_rad / QD4310_TWO_PI) * 65535.0f);
+    return qd4310_send_only(motor, QD4310_CMD_ANGLE, (int16_t)raw);
+}
+
 HAL_StatusTypeDef qd4310_set_step_angle_only(qd4310_t *motor,
                                              float step_angle_rad)
 {

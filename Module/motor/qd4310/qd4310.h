@@ -56,6 +56,7 @@ HAL_StatusTypeDef qd4310_disable(qd4310_t *motor);
 HAL_StatusTypeDef qd4310_reboot(qd4310_t *motor);
 HAL_StatusTypeDef qd4310_set_zero_pos(qd4310_t *motor);
 HAL_StatusTypeDef qd4310_set_angle(qd4310_t *motor, float angle_rad);
+HAL_StatusTypeDef qd4310_set_angle_only(qd4310_t *motor, float angle_rad);
 HAL_StatusTypeDef qd4310_set_step_angle_only(qd4310_t *motor,
                                              float step_angle_rad);
 HAL_StatusTypeDef qd4310_set_speed_only(qd4310_t *motor, float speed_rpm);

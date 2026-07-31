@@ -15,6 +15,11 @@ volatile float g_qd4310_test_target_position_mm = QD4310_TEST_TARGET_POSITION_MM
 volatile float g_qd4310_test_initial_angle_deg = QD4310_TEST_INITIAL_ANGLE_DEG;
 volatile float g_qd4310_test_step_angle_deg = QD4310_TEST_STEP_ANGLE_DEG;
 volatile float g_qd4310_test_deadband_mm = QD4310_TEST_DEADBAND_MM;
+volatile float g_qd4310_test_kp_deg_per_mm = QD4310_TEST_KP_DEG_PER_MM;
+volatile float g_qd4310_test_kd_deg_per_mm_s = QD4310_TEST_KD_DEG_PER_MM_S;
+volatile float g_qd4310_test_max_correction_deg = QD4310_TEST_MAX_CORRECTION_DEG;
+volatile float g_qd4310_test_max_angle_delta_deg = QD4310_TEST_MAX_ANGLE_DELTA_DEG;
+volatile float g_qd4310_test_velocity_lpf_alpha = QD4310_TEST_VELOCITY_LPF_ALPHA;
 volatile int8_t g_qd4310_test_direction_sign = 1;
 
 volatile uint8_t g_qd4310_test_online = 0U;
@@ -25,6 +30,14 @@ volatile float g_qd4310_test_speed_rpm = 0.0f;
 volatile float g_qd4310_test_current_a = 0.0f;
 volatile float g_qd4310_test_actual_position_mm = 0.0f;
 volatile float g_qd4310_test_position_error_mm = 0.0f;
+volatile float g_qd4310_test_ball_velocity_mm_s = 0.0f;
+volatile float g_qd4310_test_filtered_velocity_mm_s = 0.0f;
+volatile float g_qd4310_test_p_output_deg = 0.0f;
+volatile float g_qd4310_test_d_output_deg = 0.0f;
+volatile float g_qd4310_test_pd_output_deg = 0.0f;
+volatile float g_qd4310_test_raw_target_angle_deg = 0.0f;
+volatile float g_qd4310_test_target_angle_deg = 0.0f;
+volatile float g_qd4310_test_last_angle_delta_deg = 0.0f;
 volatile float g_qd4310_test_last_step_deg = 0.0f;
 volatile uint8_t g_qd4310_test_angle_limit_blocked = 0U;
 volatile uint32_t g_qd4310_test_last_vision_sequence = 0U;
@@ -47,6 +60,9 @@ namespace
     qd4310_t g_qd4310_motor;
     uint32_t g_last_control_frame_count;
     uint8_t g_have_control_frame;
+    uint8_t g_have_velocity_sample;
+    float g_last_position_mm;
+    uint32_t g_last_position_tick_ms;
     uint8_t g_previous_authorized;
 
     float fAbs(float value)
@@ -60,7 +76,21 @@ namespace
     }
 
     HAL_StatusTypeDef eSendStep(float step_deg);
+    HAL_StatusTypeDef eSendAngle(float angle_deg);
     void vRecordSend(HAL_StatusTypeDef status, uint8_t action);
+
+    float fClamp(float value, float min_value, float max_value)
+    {
+        if (value < min_value)
+        {
+            return min_value;
+        }
+        if (value > max_value)
+        {
+            return max_value;
+        }
+        return value;
+    }
 
     bool bPrepareStep(float requested_deg, float *applied_deg)
     {
@@ -190,6 +220,12 @@ namespace
                                           step_deg * kDegToRad);
     }
 
+    HAL_StatusTypeDef eSendAngle(float angle_deg)
+    {
+        return qd4310_set_angle_only(&g_qd4310_motor,
+                                     angle_deg * kDegToRad);
+    }
+
     void vRecordSend(HAL_StatusTypeDef status, uint8_t action)
     {
         g_qd4310_test_last_status = static_cast<uint8_t>(status);
@@ -230,8 +266,19 @@ namespace
         g_qd4310_test_angle_deg = QD4310_TEST_MIN_ANGLE_DEG;
         g_qd4310_test_angle_limit_blocked = 0U;
         g_qd4310_test_stop_reason = QD4310_TEST_STOP_REASON_NONE;
+        g_qd4310_test_ball_velocity_mm_s = 0.0f;
+        g_qd4310_test_filtered_velocity_mm_s = 0.0f;
+        g_qd4310_test_p_output_deg = 0.0f;
+        g_qd4310_test_d_output_deg = 0.0f;
+        g_qd4310_test_pd_output_deg = 0.0f;
+        g_qd4310_test_raw_target_angle_deg = g_qd4310_test_initial_angle_deg;
+        g_qd4310_test_target_angle_deg = g_qd4310_test_initial_angle_deg;
+        g_qd4310_test_last_angle_delta_deg = 0.0f;
         g_have_control_frame = 0U;
         g_last_control_frame_count = 0U;
+        g_have_velocity_sample = 0U;
+        g_last_position_mm = 0.0f;
+        g_last_position_tick_ms = 0U;
 
         if (g_qd4310_test_motion_authorized == 0U)
         {
@@ -308,31 +355,83 @@ namespace
 
         const float error = g_qd4310_test_position_error_mm;
         const float deadband = fAbs(g_qd4310_test_deadband_mm);
-        float step_deg = 0.0f;
+        const float actual_position_mm = g_qd4310_test_actual_position_mm;
+        float effective_error = 0.0f;
+        float velocity_mm_s = 0.0f;
+        const uint32_t sample_tick = data.receive_tick_ms;
 
         if (error > deadband)
         {
-            step_deg = static_cast<float>(cDirectionSign()) *
-                       fAbs(g_qd4310_test_step_angle_deg);
+            effective_error = error - deadband;
         }
         else if (error < -deadband)
         {
-            step_deg = -static_cast<float>(cDirectionSign()) *
-                       fAbs(g_qd4310_test_step_angle_deg);
+            effective_error = error + deadband;
         }
 
-        if (step_deg == 0.0f)
+        if (g_have_velocity_sample != 0U &&
+            sample_tick != g_last_position_tick_ms)
         {
-            g_qd4310_test_last_step_deg = 0.0f;
-            g_qd4310_test_angle_limit_blocked = 0U;
-            g_qd4310_test_state = QD4310_TEST_STATE_BALANCE_RUN;
-            return;
+            const uint32_t dt_ms = sample_tick - g_last_position_tick_ms;
+            velocity_mm_s = (actual_position_mm - g_last_position_mm) *
+                            1000.0f / static_cast<float>(dt_ms);
         }
+        g_have_velocity_sample = 1U;
+        g_last_position_mm = actual_position_mm;
+        g_last_position_tick_ms = sample_tick;
 
-        const uint8_t action = step_deg > 0.0f
-                                   ? QD4310_TEST_ACTION_STEP_POSITIVE
-                                   : QD4310_TEST_ACTION_STEP_NEGATIVE;
-        (void)bSendLimitedStep(step_deg, action);
+        float alpha = g_qd4310_test_velocity_lpf_alpha;
+        alpha = fClamp(alpha, 0.0f, 0.98f);
+        g_qd4310_test_ball_velocity_mm_s = velocity_mm_s;
+        g_qd4310_test_filtered_velocity_mm_s =
+            alpha * g_qd4310_test_filtered_velocity_mm_s +
+            (1.0f - alpha) * velocity_mm_s;
+
+        const float control_sign = static_cast<float>(cDirectionSign());
+        g_qd4310_test_p_output_deg =
+            control_sign * g_qd4310_test_kp_deg_per_mm * effective_error;
+        g_qd4310_test_d_output_deg =
+            -control_sign * g_qd4310_test_kd_deg_per_mm_s *
+            g_qd4310_test_filtered_velocity_mm_s;
+
+        float pd_output = g_qd4310_test_p_output_deg +
+                          g_qd4310_test_d_output_deg;
+        const float max_correction = fAbs(g_qd4310_test_max_correction_deg);
+        pd_output = fClamp(pd_output, -max_correction, max_correction);
+        g_qd4310_test_pd_output_deg = pd_output;
+
+        g_qd4310_test_raw_target_angle_deg =
+            fClamp(g_qd4310_test_initial_angle_deg + pd_output,
+                   QD4310_TEST_MIN_ANGLE_DEG,
+                   QD4310_TEST_MAX_ANGLE_DEG);
+
+        const float max_delta = fAbs(g_qd4310_test_max_angle_delta_deg);
+        const float angle_delta =
+            fClamp(g_qd4310_test_raw_target_angle_deg -
+                       g_qd4310_test_angle_deg,
+                   -max_delta,
+                   max_delta);
+        g_qd4310_test_last_angle_delta_deg = angle_delta;
+        g_qd4310_test_last_step_deg = angle_delta;
+        g_qd4310_test_target_angle_deg =
+            fClamp(g_qd4310_test_angle_deg + angle_delta,
+                   QD4310_TEST_MIN_ANGLE_DEG,
+                   QD4310_TEST_MAX_ANGLE_DEG);
+        g_qd4310_test_angle_limit_blocked =
+            (g_qd4310_test_raw_target_angle_deg !=
+             g_qd4310_test_initial_angle_deg + pd_output) ? 1U : 0U;
+
+        const HAL_StatusTypeDef status =
+            eSendAngle(g_qd4310_test_target_angle_deg);
+        if (status == HAL_OK)
+        {
+            g_qd4310_test_angle_deg = g_qd4310_test_target_angle_deg;
+            ++g_qd4310_test_step_count;
+        }
+        vRecordSend(status,
+                    angle_delta >= 0.0f
+                        ? QD4310_TEST_ACTION_STEP_POSITIVE
+                        : QD4310_TEST_ACTION_STEP_NEGATIVE);
         if (g_qd4310_test_state != QD4310_TEST_STATE_ERROR)
         {
             g_qd4310_test_state = QD4310_TEST_STATE_BALANCE_RUN;
@@ -389,8 +488,15 @@ namespace
                 break;
             case QD4310_TEST_ACTION_RESET_ESTIMATE:
                 g_qd4310_test_angle_deg = 0.0f;
+                g_qd4310_test_target_angle_deg = 0.0f;
+                g_qd4310_test_last_angle_delta_deg = 0.0f;
+                g_qd4310_test_ball_velocity_mm_s = 0.0f;
+                g_qd4310_test_filtered_velocity_mm_s = 0.0f;
                 g_have_control_frame = 0U;
                 g_last_control_frame_count = 0U;
+                g_have_velocity_sample = 0U;
+                g_last_position_mm = 0.0f;
+                g_last_position_tick_ms = 0U;
                 break;
             case QD4310_TEST_ACTION_NONE:
             default:

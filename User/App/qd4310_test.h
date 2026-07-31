@@ -16,6 +16,11 @@ extern "C" {
 #define QD4310_TEST_INITIAL_ANGLE_DEG    31.5f
 #define QD4310_TEST_STEP_ANGLE_DEG       0.8f
 #define QD4310_TEST_DEADBAND_MM          5.0f
+#define QD4310_TEST_KP_DEG_PER_MM        0.03f
+#define QD4310_TEST_KD_DEG_PER_MM_S      0.010f
+#define QD4310_TEST_MAX_CORRECTION_DEG   8.0f
+#define QD4310_TEST_MAX_ANGLE_DELTA_DEG  0.4f
+#define QD4310_TEST_VELOCITY_LPF_ALPHA   0.70f
 #define QD4310_TEST_MANUAL_MODE_DEFAULT  1U
 
 #define QD4310_TEST_STOP_REASON_NONE       0U
@@ -58,6 +63,11 @@ extern volatile float g_qd4310_test_target_position_mm;
 extern volatile float g_qd4310_test_initial_angle_deg;
 extern volatile float g_qd4310_test_step_angle_deg;
 extern volatile float g_qd4310_test_deadband_mm;
+extern volatile float g_qd4310_test_kp_deg_per_mm;
+extern volatile float g_qd4310_test_kd_deg_per_mm_s;
+extern volatile float g_qd4310_test_max_correction_deg;
+extern volatile float g_qd4310_test_max_angle_delta_deg;
+extern volatile float g_qd4310_test_velocity_lpf_alpha;
 extern volatile int8_t g_qd4310_test_direction_sign;
 
 /* Ozone diagnostics. Angle is a software estimate because no motor feedback is used. */
@@ -69,6 +79,14 @@ extern volatile float g_qd4310_test_speed_rpm;
 extern volatile float g_qd4310_test_current_a;
 extern volatile float g_qd4310_test_actual_position_mm;
 extern volatile float g_qd4310_test_position_error_mm;
+extern volatile float g_qd4310_test_ball_velocity_mm_s;
+extern volatile float g_qd4310_test_filtered_velocity_mm_s;
+extern volatile float g_qd4310_test_p_output_deg;
+extern volatile float g_qd4310_test_d_output_deg;
+extern volatile float g_qd4310_test_pd_output_deg;
+extern volatile float g_qd4310_test_raw_target_angle_deg;
+extern volatile float g_qd4310_test_target_angle_deg;
+extern volatile float g_qd4310_test_last_angle_delta_deg;
 extern volatile float g_qd4310_test_last_step_deg;
 extern volatile uint8_t g_qd4310_test_angle_limit_blocked;
 extern volatile uint32_t g_qd4310_test_last_vision_sequence;
