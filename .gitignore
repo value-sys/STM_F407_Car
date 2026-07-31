@@ -7,6 +7,16 @@
 /out/
 /mx.scratch/
 
+# Local DAPLink/OpenOCD flashing files
+/DAPLink_Flash.bat
+/DAPLink_OpenOCD.bat
+/OpenOCD/
+/Tools/
+
+# Report sources, exports, and rendering QA artifacts
+/report/
+/tmp/
+
 # Compiler and linker output
 *.o
 *.obj
