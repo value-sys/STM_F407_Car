@@ -21,8 +21,10 @@ volatile uint8_t g_ucLineRouteMarkerActive;
 volatile uint8_t g_ucLineRouteMarkerCount;
 volatile float g_fLineRouteSegmentDistanceMm;
 volatile float g_fLineRouteCurveAngleDeg;
+volatile float g_fLineRouteCommandRpm;
 
 static uint8_t s_ucFinishConfirmCount;
+static uint32_t s_ulStartBlindElapsedMs;
 static int32_t s_lMotor1SegmentStartCount;
 static int32_t s_lMotor2SegmentStartCount;
 static uint32_t s_ulLastImuSampleCount;
@@ -32,6 +34,37 @@ static float s_fCurveSignedAngleDeg;
 static float fLineRouteAbs(float fValue)
 {
     return (fValue < 0.0f) ? -fValue : fValue;
+}
+
+static float fLineRouteUpdateCommandRpm(float fTargetRpm)
+{
+    float fRateRpmPerS;
+    float fMaxStepRpm;
+    float fErrorRpm = fTargetRpm - g_fLineRouteCommandRpm;
+
+    fRateRpmPerS = (fErrorRpm >= 0.0f) ?
+        LINE_LAP_ACCEL_RPM_PER_S : LINE_LAP_DECEL_RPM_PER_S;
+    if (fRateRpmPerS <= 0.0f)
+    {
+        g_fLineRouteCommandRpm = fTargetRpm;
+        return g_fLineRouteCommandRpm;
+    }
+
+    fMaxStepRpm = fRateRpmPerS *
+        (float)LINE_TRACK_TASK_PERIOD_MS / 1000.0f;
+    if (fErrorRpm > fMaxStepRpm)
+    {
+        g_fLineRouteCommandRpm += fMaxStepRpm;
+    }
+    else if (fErrorRpm < -fMaxStepRpm)
+    {
+        g_fLineRouteCommandRpm -= fMaxStepRpm;
+    }
+    else
+    {
+        g_fLineRouteCommandRpm = fTargetRpm;
+    }
+    return g_fLineRouteCommandRpm;
 }
 
 static float fLineRouteWrapYawDelta(float fDeltaDeg)
@@ -57,6 +90,17 @@ static uint8_t ucLineRouteCountBits(uint8_t ucValue)
         ucValue >>= 1U;
     }
     return ucCount;
+}
+
+/**
+  * @brief  判断8路灰度中是否存在两个相邻通道同时为黑
+  * @param  ucBlackMask D1-D8对应bit0-bit7，1表示黑色
+  * @return 1表示存在相邻黑色通道，否则返回0
+  */
+static uint8_t ucLineRouteHasAdjacentBlack(uint8_t ucBlackMask)
+{
+    return ((ucBlackMask & (uint8_t)(ucBlackMask >> 1U)) != 0U) ?
+        1U : 0U;
 }
 
 static void vLineRouteCaptureStraightStart(void)
@@ -173,6 +217,7 @@ static void vLineRouteAdvanceState(void)
             g_emLineRouteState = emLineRouteStopped;
             g_ucLineRouteMarkerArmed = 0U;
             g_ucLineRouteMarkerActive = 0U;
+            g_fLineRouteCommandRpm = 0.0f;
             vLineTrackStop();
             vChassisStop();
             break;
@@ -182,6 +227,8 @@ static void vLineRouteAdvanceState(void)
             return;
     }
 
+    /* 状态切换时先解除直线末段约束，下一直线段再按里程重新开启。 */
+    vLineTrackSetCurveEntryConstraint(0U);
     g_ucLineRouteMarkerCount++;
     s_ucFinishConfirmCount = 0U;
 }
@@ -194,7 +241,10 @@ void vLineRouteStart(void)
     g_ucLineRouteMarkerActive = 0U;
     g_ucLineRouteMarkerCount = 0U;
     g_fLineRouteCurveAngleDeg = 0.0f;
+    g_fLineRouteCommandRpm = LINE_LAP_STRAIGHT_TARGET_RPM;
     s_ucFinishConfirmCount = 0U;
+    s_ulStartBlindElapsedMs = 0U;
+    vLineTrackSetCurveEntryConstraint(0U);
     vLineRouteCaptureStraightStart();
     vLineTrackStart();
 }
@@ -208,7 +258,10 @@ void vLineRouteStop(void)
     g_ucLineRouteMarkerCount = 0U;
     g_fLineRouteSegmentDistanceMm = 0.0f;
     g_fLineRouteCurveAngleDeg = 0.0f;
+    g_fLineRouteCommandRpm = 0.0f;
     s_ucFinishConfirmCount = 0U;
+    s_ulStartBlindElapsedMs = 0U;
+    vLineTrackSetCurveEntryConstraint(0U);
     vLineTrackStop();
     vChassisStop();
 }
@@ -218,6 +271,7 @@ void vLineRouteUpdate(void)
     const stGrayscaleSensorDeviceParamTdf *pstGrayscale =
         c_pstGetGrayscaleSensorDeviceParam(GRAYSCALE1);
     uint8_t ucBlackMask;
+    uint8_t ucFinishBlackMask;
 
     if ((g_emLineRouteState == emLineRouteIdle) ||
         (g_emLineRouteState == emLineRouteStopped))
@@ -225,6 +279,17 @@ void vLineRouteUpdate(void)
         vChassisStop();
         return;
     }
+
+    /* 起点位于宽黑线上时，先关闭灰度循迹并直行离开起点。 */
+    if (s_ulStartBlindElapsedMs < LINE_LAP_START_BLIND_TIME_MS)
+    {
+        vLineTrackSetCurveEntryConstraint(0U);
+        vChassisMoveRpm(LINE_LAP_STRAIGHT_TARGET_RPM);
+        vLineRouteUpdateStraightDistance();
+        s_ulStartBlindElapsedMs += LINE_TRACK_TASK_PERIOD_MS;
+        return;
+    }
+
     if ((pstGrayscale == NULL) ||
         (pstGrayscale->stRunningParam.ucReadyFlag == 0U))
     {
@@ -239,29 +304,52 @@ void vLineRouteUpdate(void)
     {
         case emLineRouteStraightAB:
         case emLineRouteStraightCD:
-            vLineTrackImuUpdateByTargetRpm(LINE_ROUTE_STRAIGHT_TARGET_RPM);
             vLineRouteUpdateStraightDistance();
+            vLineTrackSetCurveEntryConstraint(
+                (g_fLineRouteSegmentDistanceMm >=
+                 (LINE_LAP_STRAIGHT_DISTANCE_MM -
+                  LINE_LAP_CURVE_ENTRY_DISTANCE_MM)) ? 1U : 0U);
+            if (g_ucLineRouteBlackCount <
+                LINE_LAP_INTERFERENCE_BLACK_COUNT)
+            {
+                vLineTrackImuUpdateByTargetRpm(
+                    fLineRouteUpdateCommandRpm(
+                        LINE_LAP_STRAIGHT_TARGET_RPM));
+            }
             if (g_fLineRouteSegmentDistanceMm >=
-                LINE_ROUTE_STRAIGHT_DISTANCE_MM)
+                LINE_LAP_STRAIGHT_DISTANCE_MM)
             {
                 vLineRouteAdvanceState();
             }
             break;
 
         case emLineRouteCurveBC:
-            vLineTrackUpdateByTargetRpm(LINE_ROUTE_CURVE_TARGET_RPM);
+            if (g_ucLineRouteBlackCount <
+                LINE_LAP_INTERFERENCE_BLACK_COUNT)
+            {
+                vLineTrackCurveUpdateByTargetRpm(
+                    fLineRouteUpdateCommandRpm(
+                        LINE_LAP_CURVE_TARGET_RPM));
+            }
             vLineRouteUpdateCurveAngle();
-            if (g_fLineRouteCurveAngleDeg >= LINE_ROUTE_CURVE_ANGLE_DEG)
+            if ((g_fLineRouteCurveAngleDeg >= LINE_LAP_CURVE_ANGLE_DEG) &&
+                ((ucBlackMask & LINE_LAP_CURVE_TO_STRAIGHT_CENTER_MASK) != 0U))
             {
                 vLineRouteAdvanceState();
             }
             break;
 
         case emLineRouteCurveDA:
-            vLineTrackUpdateByTargetRpm(LINE_ROUTE_CURVE_TARGET_RPM);
+            if (g_ucLineRouteBlackCount <
+                LINE_LAP_INTERFERENCE_BLACK_COUNT)
+            {
+                vLineTrackCurveUpdateByTargetRpm(
+                    fLineRouteUpdateCommandRpm(
+                        LINE_LAP_CURVE_TARGET_RPM));
+            }
             vLineRouteUpdateCurveAngle();
             if (g_fLineRouteCurveAngleDeg >=
-                LINE_ROUTE_DA_FINISH_SEARCH_ANGLE_DEG)
+                LINE_LAP_DA_FINISH_SEARCH_ANGLE_DEG)
             {
                 vLineRouteAdvanceState();
             }
@@ -269,17 +357,20 @@ void vLineRouteUpdate(void)
 
         case emLineRouteFinishSearch:
             /* 完成第二个半圆后继续低速循迹，只在这里识别最终停止线。 */
-            vLineTrackUpdateByTargetRpm(LINE_ROUTE_CURVE_TARGET_RPM);
+            ucFinishBlackMask = (uint8_t)(ucBlackMask &
+                LINE_LAP_FINISH_SENSOR_MASK);
             g_ucLineRouteMarkerActive =
-                (g_ucLineRouteBlackCount >= LINE_ROUTE_FINISH_BLACK_COUNT) ?
+                ((ucLineRouteCountBits(ucFinishBlackMask) >=
+                  LINE_LAP_FINISH_BLACK_COUNT) &&
+                 (ucLineRouteHasAdjacentBlack(ucFinishBlackMask) != 0U)) ?
                 1U : 0U;
             if (g_ucLineRouteMarkerActive != 0U)
             {
-                if (s_ucFinishConfirmCount < LINE_ROUTE_FINISH_CONFIRM_CYCLES)
+                if (s_ucFinishConfirmCount < LINE_LAP_FINISH_CONFIRM_CYCLES)
                 {
                     s_ucFinishConfirmCount++;
                 }
-                if (s_ucFinishConfirmCount >= LINE_ROUTE_FINISH_CONFIRM_CYCLES)
+                if (s_ucFinishConfirmCount >= LINE_LAP_FINISH_CONFIRM_CYCLES)
                 {
                     vLineRouteAdvanceState();
                 }
@@ -287,6 +378,13 @@ void vLineRouteUpdate(void)
             else
             {
                 s_ucFinishConfirmCount = 0U;
+                if (g_ucLineRouteBlackCount <
+                    LINE_LAP_INTERFERENCE_BLACK_COUNT)
+                {
+                    vLineTrackCurveUpdateByTargetRpm(
+                        fLineRouteUpdateCommandRpm(
+                            LINE_LAP_CURVE_TARGET_RPM));
+                }
             }
             break;
 

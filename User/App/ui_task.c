@@ -39,7 +39,9 @@ static const char *ui_mode_name(eUiModeTdf mode)
 {
     switch (mode) {
         case UI_MODE_STANDBY: return "STANDBY";
+        case UI_MODE_GRAY_TRACK_TEST: return "GRAY TRACK TEST";
         case UI_MODE_LINE_LAP: return "LINE 1 CIRCLE";
+        case UI_MODE_AB_CURVE_TEST: return "AB CURVE TEST";
         case UI_MODE_STATIC_POSITION: return "STATIC POSITION";
         case UI_MODE_AB_CENTER: return "A-B CENTER";
         case UI_MODE_LAP_CENTER: return "1 CIRCLE CENTER";
@@ -56,7 +58,10 @@ static void ui_render(void)
     const uint32_t tenths = g_ui_elapsed_tenths % 10U;
 
     if (g_ui_run_enabled != 0U) {
-        state = g_ui_mode == UI_MODE_LINE_LAP ? "RUNNING" : "NO CTRL";
+        state = ((g_ui_mode == UI_MODE_GRAY_TRACK_TEST) ||
+                 (g_ui_mode == UI_MODE_LINE_LAP) ||
+                 (g_ui_mode == UI_MODE_AB_CURVE_TEST)) ?
+            "RUNNING" : "NO CTRL";
     } else if (g_ui_mode != UI_MODE_STANDBY) {
         state = "READY";
     }

@@ -19,8 +19,15 @@
 #define LINE_TRACK_DEG_TO_RAD         (LINE_TRACK_PI / 180.0f)
 
 /* D1最靠近左电机，D8最靠近右电机，D4/D5位于中间。 */
-static const int8_t s_acLinePosition[8] =
-    {-70, -50, -30, -10, 10, 30, 50, 70};
+/* 直线权重较平缓，降低外侧传感器对直线循迹的影响。 */
+static const int8_t s_acStraightLinePosition[8] =
+    {100, -80, -50, -10, 10, 50, 80, 100};
+/* 进入弯道前忽略左侧D1-D4，只保留直线权重中的D5-D8。 */
+static const int8_t s_acCurveEntryLinePosition[8] =
+    {0, 0, 0, 0, 8, 20, 50, 50};
+/* 弯道扩大外侧权重差异，使车辆更早感知弯道方向。 */
+static const int8_t s_acCurveLinePosition[8] =
+    {0, 0, 0, 15, 27, 35,39, 43};
 
 static stLineTrackDeviceParamTdf s_stLineTrackDeviceParam;
 static PID_t s_stStraightGrayPid;
@@ -29,7 +36,9 @@ static PID_t s_stStraightYawRatePid;
 static PID_t s_stCurveGrayPid;
 static PID_t s_stCurveYawRatePid;
 static uint8_t s_ucStraightYawCaptured;
+static uint8_t s_ucCurveEntryConstraint;
 static float s_fLastValidCurveSpeed;
+static float s_fCurveLineError;
 
 typedef enum
 {
@@ -53,6 +62,30 @@ static float fLineTrackLimit(float fValue, float fLimit)
         return -fLimit;
     }
     return fValue;
+}
+
+static uint8_t ucLineTrackCurveSampleIsValid(void)
+{
+    uint8_t ucBlackMask = (uint8_t)(
+        ~ucGrayscaleSensorGetDigital(GRAYSCALE1));
+    uint8_t ucShiftedMask = ucBlackMask;
+
+    /* Zero or one black channel cannot contain a gap. */
+    if ((ucBlackMask == 0U) ||
+        ((ucBlackMask & (uint8_t)(ucBlackMask - 1U)) == 0U))
+    {
+        return 1U;
+    }
+
+    while ((ucShiftedMask & 0x01U) == 0U)
+    {
+        ucShiftedMask >>= 1U;
+    }
+    while ((ucShiftedMask & 0x01U) != 0U)
+    {
+        ucShiftedMask >>= 1U;
+    }
+    return (ucShiftedMask == 0U) ? 1U : 0U;
 }
 
 static float fLineTrackRpmToLinearSpeed(float fTargetRpm)
@@ -103,6 +136,7 @@ static void vLineTrackEnterMode(emLineTrackControlModeTdf emMode)
     PID_Reset(&s_stCurveGrayPid);
     PID_Reset(&s_stCurveYawRatePid);
     s_ucStraightYawCaptured = 0U;
+    s_fCurveLineError = 0.0f;
     s_emControlMode = emMode;
 }
 
@@ -110,9 +144,25 @@ static void vLineTrackUpdateSensorState(void)
 {
     stLineTrackRunningParamTdf *pstRunning =
         &s_stLineTrackDeviceParam.stRunningParam;
+    const int8_t *pcLinePosition;
     uint8_t ucDigital = ucGrayscaleSensorGetDigital(GRAYSCALE1);
     int16_t sPositionSum = 0;
     uint8_t ucChannel;
+
+    if ((s_emControlMode == emLineTrackControlGrayImu) &&
+        (s_ucCurveEntryConstraint != 0U))
+    {
+        pcLinePosition = s_acCurveEntryLinePosition;
+    }
+    else if ((s_emControlMode == emLineTrackControlGrayOnly) ||
+        (s_emControlMode == emLineTrackControlCurveImu))
+    {
+        pcLinePosition = s_acCurveLinePosition;
+    }
+    else
+    {
+        pcLinePosition = s_acStraightLinePosition;
+    }
 
     /* 当前灰度数字量为1表示白色，取反后得到黑线位图。 */
     pstRunning->ucBlackMask = (uint8_t)(~ucDigital);
@@ -121,7 +171,7 @@ static void vLineTrackUpdateSensorState(void)
     {
         if ((pstRunning->ucBlackMask & (uint8_t)(1U << ucChannel)) != 0U)
         {
-            sPositionSum += s_acLinePosition[ucChannel];
+            sPositionSum += pcLinePosition[ucChannel];
             pstRunning->ucActiveCount++;
         }
     }
@@ -189,6 +239,12 @@ static void vLineTrackApplyYawRateControl(float fCommandSpeed,
         pstStatic->fOuterControlWeight * pstRunning->fOuterControlOmega +
         pstStatic->fImuFeedbackWeight * pstRunning->fImuControlOmega,
         pstStatic->fMaxCorrectionOmega);
+    /* 底盘约定omega为正表示左转；直线末段只允许直行或右转。 */
+    if ((s_ucCurveEntryConstraint != 0U) &&
+        (pstRunning->fCorrectionOmega > 0.0f))
+    {
+        pstRunning->fCorrectionOmega = 0.0f;
+    }
     pstRunning->fCommandSpeed = fCommandSpeed;
     vChassisSetSpeed(fCommandSpeed, pstRunning->fCorrectionOmega);
 }
@@ -204,6 +260,7 @@ void vLineTrackDeviceInit(const stLineTrackStaticParamTdf *pstInit)
         sizeof(s_stLineTrackDeviceParam));
     s_emControlMode = emLineTrackControlDisabled;
     s_ucStraightYawCaptured = 0U;
+    s_ucCurveEntryConstraint = 0U;
     s_fLastValidCurveSpeed = 0.0f;
     if (pstInit == NULL)
     {
@@ -239,7 +296,13 @@ void vLineTrackDeviceInit(const stLineTrackStaticParamTdf *pstInit)
 
 void vLineTrackStart(void)
 {
+    s_ucCurveEntryConstraint = 0U;
     s_stLineTrackDeviceParam.stRunningParam.ucEnable = 1U;
+}
+
+void vLineTrackSetCurveEntryConstraint(uint8_t ucEnable)
+{
+    s_ucCurveEntryConstraint = (ucEnable != 0U) ? 1U : 0U;
 }
 
 void vLineTrackStop(void)
@@ -256,19 +319,29 @@ void vLineTrackStop(void)
     PID_Reset(&s_stCurveYawRatePid);
     s_emControlMode = emLineTrackControlDisabled;
     s_ucStraightYawCaptured = 0U;
+    s_ucCurveEntryConstraint = 0U;
     s_fLastValidCurveSpeed = 0.0f;
+    s_fCurveLineError = 0.0f;
     vChassisStop();
 }
 
 static void vLineTrackUpdateInternal(float fBaseSpeed,
-    uint8_t ucKeepSpeedWhenLost)
+    uint8_t ucKeepSpeedWhenLost, uint8_t ucCurveSearchWhenLost)
 {
     stLineTrackStaticParamTdf *pstStatic =
         &s_stLineTrackDeviceParam.stStaticParam;
     stLineTrackRunningParamTdf *pstRunning =
         &s_stLineTrackDeviceParam.stRunningParam;
+    float fCorrectionKp = pstStatic->fCorrectionKp;
+    float fMaxCorrectionOmega = pstStatic->fMaxCorrectionOmega;
+    float fLineError;
 
     if (pstRunning->ucEnable == 0U)
+    {
+        return;
+    }
+    if ((ucCurveSearchWhenLost != 0U) &&
+        (ucLineTrackCurveSampleIsValid() == 0U))
     {
         return;
     }
@@ -284,20 +357,21 @@ static void vLineTrackUpdateInternal(float fBaseSpeed,
             pstRunning->fCommandSpeed = fBaseSpeed;
             pstRunning->fCorrectionOmega = 0.0f;
         }
-        else if (pstRunning->cLastDirection == 0)
+        else if ((ucCurveSearchWhenLost == 0U) &&
+                 (pstRunning->cLastDirection == 0))
         {
             pstRunning->fCommandSpeed = 0.0f;
             pstRunning->fCorrectionOmega = 0.0f;
         }
         else
         {
-            pstRunning->fCommandSpeed = pstStatic->fBaseSpeed *
-                pstStatic->fLostSpeedScale;
+            pstRunning->fCommandSpeed = (ucCurveSearchWhenLost != 0U) ?
+                fBaseSpeed : fBaseSpeed * pstStatic->fLostSpeedScale;
             pstRunning->fLineError = (float)pstRunning->cLastDirection;
             pstRunning->fCorrectionOmega = fLineTrackLimit(
-                LINE_TRACK_SENSOR_TURN_SIGN * pstStatic->fCorrectionKp *
+                LINE_TRACK_SENSOR_TURN_SIGN * fCorrectionKp *
                     pstRunning->fLineError,
-                pstStatic->fMaxCorrectionOmega);
+                fMaxCorrectionOmega);
         }
     }
     else if (pstRunning->emState == emLineTrackStateIntersection)
@@ -309,10 +383,17 @@ static void vLineTrackUpdateInternal(float fBaseSpeed,
     else
     {
         pstRunning->fCommandSpeed = fBaseSpeed;
+        fLineError = pstRunning->fLineError;
+        if (ucCurveSearchWhenLost != 0U)
+        {
+            s_fCurveLineError += LINE_TRACK_CURVE_ERROR_FILTER_ALPHA *
+                (fLineError - s_fCurveLineError);
+            fLineError = s_fCurveLineError;
+            pstRunning->fLineError = fLineError;
+        }
         pstRunning->fCorrectionOmega = fLineTrackLimit(
-            LINE_TRACK_SENSOR_TURN_SIGN * pstStatic->fCorrectionKp *
-                pstRunning->fLineError,
-            pstStatic->fMaxCorrectionOmega);
+            LINE_TRACK_SENSOR_TURN_SIGN * fCorrectionKp * fLineError,
+            fMaxCorrectionOmega);
         if (pstRunning->fLineError < 0.0f)
         {
             pstRunning->cLastDirection = -1;
@@ -334,12 +415,18 @@ static void vLineTrackUpdateInternal(float fBaseSpeed,
 void vLineTrackUpdate(void)
 {
     vLineTrackUpdateInternal(s_stLineTrackDeviceParam.stStaticParam.fBaseSpeed,
-        0U);
+        0U, 0U);
 }
 
 void vLineTrackUpdateByTargetRpm(float fTargetRpm)
 {
-    vLineTrackUpdateInternal(fLineTrackRpmToLinearSpeed(fTargetRpm), 1U);
+    vLineTrackUpdateInternal(fLineTrackRpmToLinearSpeed(fTargetRpm), 1U, 0U);
+}
+
+void vLineTrackCurveUpdateByTargetRpm(float fTargetRpm)
+{
+    vLineTrackUpdateInternal(fLineTrackRpmToLinearSpeed(fTargetRpm),
+        0U, 1U);
 }
 
 void vLineTrackImuUpdateByTargetRpm(float fTargetRpm)

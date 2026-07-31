@@ -165,9 +165,10 @@
 #define LINE_TRACK_TARGET_RPM                           100.0f  /* 灰度+IMU直线/弯道测试目标转速 */
 #define LINE_TRACK_GRAY_ONLY_TARGET_RPM                 100.0f   /* 纯灰度循迹测试目标转速 */
 #define LINE_TRACK_BASE_SPEED                           314.1593f /* 默认线速度，单位mm/s */
-#define LINE_TRACK_CORRECTION_KP                       2.3f    /* 传统灰度比例修正系数 */
-#define LINE_TRACK_MAX_CORRECTION_OMEGA                 4.0f    /* 底盘循迹角速度限幅，单位rad/s */
-#define LINE_TRACK_LOST_SPEED_SCALE                     0.5f    /* 传统灰度丢线时的速度比例 */
+#define LINE_TRACK_CORRECTION_KP                        1.20f    /* 传统灰度比例修正系数 */
+#define LINE_TRACK_MAX_CORRECTION_OMEGA                 2.2f    /* 底盘循迹角速度限幅，单位rad/s */
+#define LINE_TRACK_LOST_SPEED_SCALE                     0.9f    /* 传统灰度丢线时的速度比例 */
+#define LINE_TRACK_CURVE_ERROR_FILTER_ALPHA             0.45f
 
 /* 直线循迹灰度位置外环，输出目标偏航角速度(°/s)。 */
 #define LINE_TRACK_STRAIGHT_GRAY_PID_KP                 30.0f   /* 直线灰度外环比例系数 */
@@ -193,20 +194,36 @@
 #define LINE_TRACK_CURVE_YAW_RATE_PID_KD                 0.0f
 #define LINE_TRACK_STRAIGHT_MAX_TARGET_YAW_RATE          60.0f
 #define LINE_TRACK_CURVE_MAX_TARGET_YAW_RATE             180.0f
-#define LINE_TRACK_OUTER_CONTROL_WEIGHT                  1.3f
-#define LINE_TRACK_IMU_FEEDBACK_WEIGHT                   0.7f
+#define LINE_TRACK_OUTER_CONTROL_WEIGHT                  1.0f
+#define LINE_TRACK_IMU_FEEDBACK_WEIGHT                   1.0f
 #define LINE_TRACK_SENSOR_TURN_SIGN                      1.0f
 #define LINE_TRACK_IMU_TURN_SIGN                         1.0f
 
 /* ============================== ABCD路线状态机参数 ============================== */
 
-#define LINE_ROUTE_STRAIGHT_TARGET_RPM                  100.0f /* AB、CD直线段目标转速 */
-#define LINE_ROUTE_CURVE_TARGET_RPM                      50.0f /* BC、DA弯道目标转速 */
-#define LINE_ROUTE_STRAIGHT_DISTANCE_MM                 1400.0f /* AB、CD直线段切换距离，单位mm */
-#define LINE_ROUTE_CURVE_ANGLE_DEG                       180.0f /* BC、DA半圆弯道累计转角，单位度 */
-#define LINE_ROUTE_DA_FINISH_SEARCH_ANGLE_DEG            160.0f /* DA累计到该角度后开始识别停止线 */
-#define LINE_ROUTE_FINISH_BLACK_COUNT                     3U    /* 最后停止线至少覆盖的灰度通道数 */
-#define LINE_ROUTE_FINISH_CONFIRM_CYCLES                  1U    /* 停止线连续确认周期数，1次为10ms */
+#define LINE_LAP_STRAIGHT_TARGET_RPM                    155.0f /* AB、CD直线段目标转速 */
+#define LINE_LAP_CURVE_TARGET_RPM                        75.0f /* BC、DA弯道目标转速 */
+#define LINE_LAP_ACCEL_RPM_PER_S                        20.0f /* 弯道切直线时的T型加速度，单位RPM/s */
+#define LINE_LAP_DECEL_RPM_PER_S                        200.0f /* 直线切弯道时的T型减速度，单位RPM/s */
+#define LINE_LAP_START_BLIND_TIME_MS                      100U /* 启动后关闭灰度循迹并直行的时间，单位ms */
+#define LINE_LAP_STRAIGHT_DISTANCE_MM                  1250.0f /* AB、CD直线段切换距离，单位mm */
+#define LINE_LAP_CURVE_ENTRY_DISTANCE_MM               160.0f /* 直线末段进入弯道前的单向修正区间，单位mm */
+#define LINE_LAP_CURVE_ANGLE_DEG                        180.0f /* BC、DA半圆弯道累计转角，单位度 */
+#define LINE_LAP_CURVE_TO_STRAIGHT_CENTER_MASK            0x18U /* D4或D5压黑，允许弯道切换直线 */
+#define LINE_LAP_DA_FINISH_SEARCH_ANGLE_DEG             160.0f /* DA累计到该角度后开始识别停止线 */
+#define LINE_LAP_INTERFERENCE_BLACK_COUNT                  3U    /* 普通循迹时达到该黑色通道数则忽略当前帧 */
+#define LINE_LAP_FINISH_SENSOR_MASK                       0xF0U /* 停止线只使用D5-D8，忽略D1-D4 */
+#define LINE_LAP_FINISH_BLACK_COUNT                       2U    /* 最后停止线至少覆盖相邻的灰度通道数 */
+#define LINE_LAP_FINISH_CONFIRM_CYCLES                    1U    /* 停止线连续确认周期数，1次为10ms */
+
+/* AB直线后切换弯道循迹并定时停车，参数与整圈状态机独立。 */
+#define LINE_AB_CURVE_STRAIGHT_TARGET_RPM               80.0f /* AB直线段目标转速 */
+#define LINE_AB_CURVE_CURVE_TARGET_RPM                  45.0f /* B点后弯道目标转速 */
+#define LINE_AB_CURVE_ACCEL_RPM_PER_S                  100.0f /* 独立T型加速度，单位RPM/s */
+#define LINE_AB_CURVE_DECEL_RPM_PER_S                  100.0f /* 独立T型减速度，单位RPM/s */
+#define LINE_AB_CURVE_STRAIGHT_DISTANCE_MM            1300.0f /* A到B切换距离，单位mm */
+#define LINE_AB_CURVE_RUN_TIME_MS                      500U   /* 弯道循迹持续时间，单位ms */
+#define LINE_AB_CURVE_INTERFERENCE_BLACK_COUNT            3U    /* 达到该黑色通道数则忽略当前循迹帧 */
 
 /* ============================== 调试与串口监视参数 ============================== */
 
@@ -218,5 +235,7 @@
 #define DEBUG_CASCADE_ROTATE_OMEGA_RAD_S                0.6f    /* 旋转前馈车体角速度，单位rad/s */
 #define DEBUG_CASCADE_ROTATE_AFTER_TARGET_RPM           50.0f
 #define VOFA_SEND_PERIOD_MS                             100U    /* VOFA数据发送周期，单位ms */
+
+
 
 #endif
