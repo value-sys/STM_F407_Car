@@ -163,10 +163,10 @@
 
 #define LINE_TRACK_TASK_PERIOD_MS                       10U     /* 循迹控制周期，单位ms */
 #define LINE_TRACK_TARGET_RPM                           100.0f  /* 灰度+IMU直线/弯道测试目标转速 */
-#define LINE_TRACK_GRAY_ONLY_TARGET_RPM                 50.0f   /* 纯灰度循迹测试目标转速 */
+#define LINE_TRACK_GRAY_ONLY_TARGET_RPM                 100.0f   /* 纯灰度循迹测试目标转速 */
 #define LINE_TRACK_BASE_SPEED                           314.1593f /* 默认线速度，单位mm/s */
-#define LINE_TRACK_CORRECTION_KP                        5.0f    /* 传统灰度比例修正系数 */
-#define LINE_TRACK_MAX_CORRECTION_OMEGA                 5.0f    /* 底盘循迹角速度限幅，单位rad/s */
+#define LINE_TRACK_CORRECTION_KP                       2.3f    /* 传统灰度比例修正系数 */
+#define LINE_TRACK_MAX_CORRECTION_OMEGA                 4.0f    /* 底盘循迹角速度限幅，单位rad/s */
 #define LINE_TRACK_LOST_SPEED_SCALE                     0.5f    /* 传统灰度丢线时的速度比例 */
 
 /* 直线循迹灰度位置外环，输出目标偏航角速度(°/s)。 */

@@ -20,7 +20,7 @@
 
 /* D1~D4位于左侧，D5~D8位于右侧。 */
 static const int8_t s_acLinePosition[8] =
-    {-80, -50, -15, -10, 10, 15, 50, 80};
+    {-70, -50, -30, -10, 10, 30, 50, 70};
 
 static stLineTrackDeviceParamTdf s_stLineTrackDeviceParam;
 static PID_t s_stStraightGrayPid;

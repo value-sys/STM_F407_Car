@@ -219,7 +219,7 @@ void StartDefaultTask(void *argument)
       }
       else if (g_emDebugMode == emDebugModeGrayLineTrack)
       {
-        /* 纯灰度循迹不使用IMU，测试目标速度为50RPM。 */
+        /* Pure grayscale tracking speed is configured by LINE_TRACK_GRAY_ONLY_TARGET_RPM. */
         vLineTrackUpdateByTargetRpm(LINE_TRACK_GRAY_ONLY_TARGET_RPM);
       }
 

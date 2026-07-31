@@ -12,6 +12,15 @@
 static stGrayscaleSensorDeviceParamTdf
     s_astGrayscaleSensorDeviceParam[GRAYSCALE_SENSOR_DEV_NUM];
 
+volatile uint8_t g_ucGrayscaleD1;
+volatile uint8_t g_ucGrayscaleD2;
+volatile uint8_t g_ucGrayscaleD3;
+volatile uint8_t g_ucGrayscaleD4;
+volatile uint8_t g_ucGrayscaleD5;
+volatile uint8_t g_ucGrayscaleD6;
+volatile uint8_t g_ucGrayscaleD7;
+volatile uint8_t g_ucGrayscaleD8;
+
 /// @brief 产生参考驱动所需的微秒级GPIO建立和保持时间
 /// @note  当前STM32F407运行于168MHz，14次空循环沿用参考工程实测参数。
 static void vGrayscaleDelayUs(uint32_t ulDelayUs)
@@ -112,6 +121,7 @@ void vGrayscaleSensorTask(emGrayscaleSensorDevNumTdf emDevNum)
 {
     stGrayscaleSensorDeviceParamTdf *pstDevice;
     uint8_t ucRaw;
+    uint8_t ucBlackMask;
 
     if (emDevNum >= emGrayscaleSensorDevNumMax)
     {
@@ -126,6 +136,15 @@ void vGrayscaleSensorTask(emGrayscaleSensorDevNumTdf emDevNum)
         ucRaw = ucGrayscaleReverseBits(ucRaw);
     }
     pstDevice->stRunningParam.ucDigitalOutput = ucRaw;
+    ucBlackMask = (uint8_t)(~ucRaw);
+    g_ucGrayscaleD1 = (uint8_t)((ucBlackMask >> 0U) & 0x01U);
+    g_ucGrayscaleD2 = (uint8_t)((ucBlackMask >> 1U) & 0x01U);
+    g_ucGrayscaleD3 = (uint8_t)((ucBlackMask >> 2U) & 0x01U);
+    g_ucGrayscaleD4 = (uint8_t)((ucBlackMask >> 3U) & 0x01U);
+    g_ucGrayscaleD5 = (uint8_t)((ucBlackMask >> 4U) & 0x01U);
+    g_ucGrayscaleD6 = (uint8_t)((ucBlackMask >> 5U) & 0x01U);
+    g_ucGrayscaleD7 = (uint8_t)((ucBlackMask >> 6U) & 0x01U);
+    g_ucGrayscaleD8 = (uint8_t)((ucBlackMask >> 7U) & 0x01U);
     pstDevice->stRunningParam.ucReadyFlag = 1U;
 }
 

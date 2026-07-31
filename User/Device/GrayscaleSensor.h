@@ -41,6 +41,16 @@ typedef struct
     stGrayscaleSensorRunningParamTdf stRunningParam;
 } stGrayscaleSensorDeviceParamTdf;
 
+/* Ozone watch variables: 1 means black line, 0 means white surface. */
+extern volatile uint8_t g_ucGrayscaleD1;
+extern volatile uint8_t g_ucGrayscaleD2;
+extern volatile uint8_t g_ucGrayscaleD3;
+extern volatile uint8_t g_ucGrayscaleD4;
+extern volatile uint8_t g_ucGrayscaleD5;
+extern volatile uint8_t g_ucGrayscaleD6;
+extern volatile uint8_t g_ucGrayscaleD7;
+extern volatile uint8_t g_ucGrayscaleD8;
+
 const stGrayscaleSensorDeviceParamTdf *c_pstGetGrayscaleSensorDeviceParam(
     emGrayscaleSensorDevNumTdf emDevNum);
 
