@@ -43,7 +43,11 @@ static uint8_t ucGrayscaleReverseBits(uint8_t ucValue)
     return (uint8_t)((ucValue << 4U) | (ucValue >> 4U));
 }
 
-/* Map the observed serial bit order to physical channels 1 through 8. */
+/*
+ * 单路实测得到原始位序：bit0=D1、bit7=D2、bit6=D3、bit5=D4、
+ * bit4=D5、bit3=D6、bit2=D7、bit1=D8。
+ * 重排后bit0~bit7依次对应物理D1~D8，供循迹和VOFA共同使用。
+ */
 static uint8_t ucGrayscaleMapChannelOrder(uint8_t ucRaw)
 {
     uint8_t ucMapped = (uint8_t)(ucRaw & 0x01U);

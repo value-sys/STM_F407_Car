@@ -144,7 +144,7 @@ static void vLineRouteUpdateCurveAngle(void)
     s_fLastYawDeg = fCurrentYawDeg;
     s_ulLastImuSampleCount = ulSampleCount;
 
-    /* 带符号累计后再取绝对值，左右弯均可，反向摆动也不会虚增角度。 */
+    /* 带符号累计后再取绝对值，左右弯均可用，反向摆动也不会虚增角度。 */
     s_fCurveSignedAngleDeg += fYawDeltaDeg;
     g_fLineRouteCurveAngleDeg = fLineRouteAbs(s_fCurveSignedAngleDeg);
 }

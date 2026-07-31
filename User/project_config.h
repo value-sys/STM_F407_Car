@@ -170,7 +170,7 @@
 #define LINE_TRACK_LOST_SPEED_SCALE                     0.5f    /* 传统灰度丢线时的速度比例 */
 
 /* 直线循迹灰度位置外环，输出目标偏航角速度(°/s)。 */
-#define LINE_TRACK_STRAIGHT_GRAY_PID_KP                 60.0f   /* 直线灰度外环比例系数 */
+#define LINE_TRACK_STRAIGHT_GRAY_PID_KP                 30.0f   /* 直线灰度外环比例系数 */
 #define LINE_TRACK_STRAIGHT_GRAY_PID_KI                 0.0f    /* 直线灰度外环积分系数 */
 #define LINE_TRACK_STRAIGHT_GRAY_PID_KD                 0.0f    /* 直线灰度外环微分系数 */
 
@@ -193,8 +193,8 @@
 #define LINE_TRACK_CURVE_YAW_RATE_PID_KD                 0.0f
 #define LINE_TRACK_STRAIGHT_MAX_TARGET_YAW_RATE          60.0f
 #define LINE_TRACK_CURVE_MAX_TARGET_YAW_RATE             180.0f
-#define LINE_TRACK_OUTER_CONTROL_WEIGHT                  1.6f
-#define LINE_TRACK_IMU_FEEDBACK_WEIGHT                   0.4f
+#define LINE_TRACK_OUTER_CONTROL_WEIGHT                  1.3f
+#define LINE_TRACK_IMU_FEEDBACK_WEIGHT                   0.7f
 #define LINE_TRACK_SENSOR_TURN_SIGN                      1.0f
 #define LINE_TRACK_IMU_TURN_SIGN                         1.0f
 
