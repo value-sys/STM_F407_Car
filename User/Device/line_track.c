@@ -18,9 +18,9 @@
 #define LINE_TRACK_PI                 3.14159265358979323846f
 #define LINE_TRACK_DEG_TO_RAD         (LINE_TRACK_PI / 180.0f)
 
-/* D1~D4位于左侧，D5~D8位于右侧。 */
+/* D1最靠近左电机，D8最靠近右电机，D4/D5位于中间。 */
 static const int8_t s_acLinePosition[8] =
-    {-80, -50, -15, -10, 10, 15, 50, 80};
+    {-50, -25, -15, 15, 25, 50, 80, -80};
 
 static stLineTrackDeviceParamTdf s_stLineTrackDeviceParam;
 static PID_t s_stStraightGrayPid;
