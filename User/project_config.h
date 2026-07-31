@@ -163,14 +163,14 @@
 
 #define LINE_TRACK_TASK_PERIOD_MS                       10U     /* 循迹控制周期，单位ms */
 #define LINE_TRACK_TARGET_RPM                           100.0f  /* 灰度+IMU直线/弯道测试目标转速 */
-#define LINE_TRACK_GRAY_ONLY_TARGET_RPM                 50.0f   /* 纯灰度循迹测试目标转速 */
+#define LINE_TRACK_GRAY_ONLY_TARGET_RPM                 100.0f   /* 纯灰度循迹测试目标转速 */
 #define LINE_TRACK_BASE_SPEED                           314.1593f /* 默认线速度，单位mm/s */
-#define LINE_TRACK_CORRECTION_KP                        5.0f    /* 传统灰度比例修正系数 */
-#define LINE_TRACK_MAX_CORRECTION_OMEGA                 5.0f    /* 底盘循迹角速度限幅，单位rad/s */
+#define LINE_TRACK_CORRECTION_KP                       2.3f    /* 传统灰度比例修正系数 */
+#define LINE_TRACK_MAX_CORRECTION_OMEGA                 4.0f    /* 底盘循迹角速度限幅，单位rad/s */
 #define LINE_TRACK_LOST_SPEED_SCALE                     0.5f    /* 传统灰度丢线时的速度比例 */
 
 /* 直线循迹灰度位置外环，输出目标偏航角速度(°/s)。 */
-#define LINE_TRACK_STRAIGHT_GRAY_PID_KP                 60.0f   /* 直线灰度外环比例系数 */
+#define LINE_TRACK_STRAIGHT_GRAY_PID_KP                 30.0f   /* 直线灰度外环比例系数 */
 #define LINE_TRACK_STRAIGHT_GRAY_PID_KI                 0.0f    /* 直线灰度外环积分系数 */
 #define LINE_TRACK_STRAIGHT_GRAY_PID_KD                 0.0f    /* 直线灰度外环微分系数 */
 
@@ -193,10 +193,20 @@
 #define LINE_TRACK_CURVE_YAW_RATE_PID_KD                 0.0f
 #define LINE_TRACK_STRAIGHT_MAX_TARGET_YAW_RATE          60.0f
 #define LINE_TRACK_CURVE_MAX_TARGET_YAW_RATE             180.0f
-#define LINE_TRACK_OUTER_CONTROL_WEIGHT                  1.6f
-#define LINE_TRACK_IMU_FEEDBACK_WEIGHT                   0.4f
+#define LINE_TRACK_OUTER_CONTROL_WEIGHT                  1.3f
+#define LINE_TRACK_IMU_FEEDBACK_WEIGHT                   0.7f
 #define LINE_TRACK_SENSOR_TURN_SIGN                      1.0f
 #define LINE_TRACK_IMU_TURN_SIGN                         1.0f
+
+/* ============================== ABCD路线状态机参数 ============================== */
+
+#define LINE_ROUTE_STRAIGHT_TARGET_RPM                  100.0f /* AB、CD直线段目标转速 */
+#define LINE_ROUTE_CURVE_TARGET_RPM                      50.0f /* BC、DA弯道目标转速 */
+#define LINE_ROUTE_STRAIGHT_DISTANCE_MM                 1400.0f /* AB、CD直线段切换距离，单位mm */
+#define LINE_ROUTE_CURVE_ANGLE_DEG                       180.0f /* BC、DA半圆弯道累计转角，单位度 */
+#define LINE_ROUTE_DA_FINISH_SEARCH_ANGLE_DEG            160.0f /* DA累计到该角度后开始识别停止线 */
+#define LINE_ROUTE_FINISH_BLACK_COUNT                     3U    /* 最后停止线至少覆盖的灰度通道数 */
+#define LINE_ROUTE_FINISH_CONFIRM_CYCLES                  1U    /* 停止线连续确认周期数，1次为10ms */
 
 /* ============================== 调试与串口监视参数 ============================== */
 

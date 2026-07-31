@@ -22,6 +22,7 @@
 #include "debug_task.h"
 #include "grayscale_task.h"
 #include "imu_task.h"
+#include "line_route.h"
 #include "line_track.h"
 #include "motor_control.h"
 #include "project_config.h"
@@ -46,7 +47,7 @@
 #define CHASSIS_TASK_STACK_WORDS     512U
 #define IMU_TASK_STACK_WORDS         512U
 #define DEBUG_TASK_STACK_WORDS       512U
-#define VOFA_TASK_STACK_WORDS        640U
+#define VOFA_TASK_STACK_WORDS        1024U
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -98,7 +99,8 @@ const osThreadAttr_t debugTask_attributes = {
 osThreadId_t vofaTask06Handle;
 const osThreadAttr_t vofaTask06_attributes = {
   .name = "vofaTask06",
-  .stack_size = 512 * 4,
+  /* VOFA帧使用浮点snprintf，增大栈空间避免格式化时栈溢出。 */
+  .stack_size = VOFA_TASK_STACK_WORDS * sizeof(StackType_t),
   .priority = (osPriority_t) osPriorityLow,
 };
 /* Definitions for QD4310 test task */
@@ -212,6 +214,7 @@ void StartDefaultTask(void *argument)
         (g_emDebugMode == emDebugModeLineTrackImu) ||
         (g_emDebugMode == emDebugModeCurveLineTrackImu) ||
         (g_emDebugMode == emDebugModeGrayLineTrack) ||
+        (g_emDebugMode == emDebugModeLineRoute) ||
         (g_emDebugMode == emDebugModeCascadeRotate))
     {
       if (emChassisImuRotateGetState() == emChassisImuRotateRunning)
@@ -231,8 +234,13 @@ void StartDefaultTask(void *argument)
       }
       else if (g_emDebugMode == emDebugModeGrayLineTrack)
       {
-        /* 纯灰度循迹不使用IMU，测试目标速度为50RPM。 */
+        /* Pure grayscale tracking speed is configured by LINE_TRACK_GRAY_ONLY_TARGET_RPM. */
         vLineTrackUpdateByTargetRpm(LINE_TRACK_GRAY_ONLY_TARGET_RPM);
+      }
+      else if (g_emDebugMode == emDebugModeLineRoute)
+      {
+        /* ABCD路线状态机：直线用灰度+IMU，弯道用纯灰度。 */
+        vLineRouteUpdate();
       }
 
       vChassisUpdate();
