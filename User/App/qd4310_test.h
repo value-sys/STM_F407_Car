@@ -11,13 +11,24 @@ extern "C" {
 #define QD4310_TEST_MOTOR_ID             0U
 #define QD4310_TEST_PERIOD_MS            20U
 #define QD4310_TEST_TARGET_POSITION_MM   125.0f
-#define QD4310_TEST_MIN_ANGLE_DEG        0.0f
+#define QD4310_TEST_MIN_ANGLE_DEG        (-10.0f)
 #define QD4310_TEST_MAX_ANGLE_DEG        103.0f
-#define QD4310_TEST_INITIAL_ANGLE_DEG    31.5f
+#define QD4310_TEST_BOOT_ANGLE_DEG       0.0f
+#define QD4310_TEST_INITIAL_ANGLE_DEG    11.5f
+#define QD4310_TEST_MANUAL_TARGET_ANGLE_DEG QD4310_TEST_INITIAL_ANGLE_DEG
+#define QD4310_TEST_MANUAL_ANGLE_EPS_DEG 0.05f
+#define QD4310_TEST_INIT_RAMP_DEFAULT    1U
+#define QD4310_TEST_INIT_RAMP_STEP_DEG   1.0f
+#define QD4310_TEST_INIT_RAMP_DELAY_MS   80U
+#define QD4310_TEST_BALANCE_MAP_SIZE     9U
+#define QD4310_TEST_BALANCE_MAP_DEFAULT  1U
 #define QD4310_TEST_STEP_ANGLE_DEG       0.8f
 #define QD4310_TEST_DEADBAND_MM          5.0f
-#define QD4310_TEST_KP_DEG_PER_MM        0.03f
-#define QD4310_TEST_KD_DEG_PER_MM_S      0.010f
+#define QD4310_TEST_KP_DEG_PER_MM        0.30f
+#define QD4310_TEST_KD_DEG_PER_MM_S      0.001f
+#define QD4310_TEST_KI_DEG_PER_MM_S      0.020f
+#define QD4310_TEST_MAX_INTEGRAL_DEG     2.0f
+#define QD4310_TEST_INTEGRAL_VEL_MM_S    8.0f
 #define QD4310_TEST_MAX_CORRECTION_DEG   8.0f
 #define QD4310_TEST_MAX_ANGLE_DELTA_DEG  0.4f
 #define QD4310_TEST_VELOCITY_LPF_ALPHA   0.70f
@@ -32,12 +43,13 @@ extern "C" {
 typedef enum
 {
     QD4310_TEST_ACTION_NONE = 0U,
-    QD4310_TEST_ACTION_ENABLE,
-    QD4310_TEST_ACTION_DISABLE,
-    QD4310_TEST_ACTION_STEP_POSITIVE,
-    QD4310_TEST_ACTION_STEP_NEGATIVE,
-    QD4310_TEST_ACTION_RESTART_INIT,
-    QD4310_TEST_ACTION_RESET_ESTIMATE
+    QD4310_TEST_ACTION_ENABLE = 1U,
+    QD4310_TEST_ACTION_DISABLE = 2U,
+    QD4310_TEST_ACTION_STEP_POSITIVE = 3U,
+    QD4310_TEST_ACTION_STEP_NEGATIVE = 4U,
+    QD4310_TEST_ACTION_RESTART_INIT = 5U,
+    QD4310_TEST_ACTION_RESET_ESTIMATE = 6U,
+    QD4310_TEST_ACTION_SET_ANGLE = 7U
 } eQd4310TestAction;
 
 typedef enum
@@ -59,12 +71,23 @@ extern volatile uint8_t g_qd4310_test_manual_mode;
 extern volatile uint8_t g_qd4310_test_balance_enabled;
 extern volatile uint8_t g_qd4310_test_stop_request;
 extern volatile uint8_t g_qd4310_test_action;
+extern volatile uint8_t g_qd4310_test_manual_angle_follow;
+extern volatile uint8_t g_qd4310_test_init_ramp_enabled;
+extern volatile uint8_t g_qd4310_test_balance_map_enabled;
+extern volatile float g_qd4310_test_manual_target_angle_deg;
+extern volatile float g_qd4310_test_init_ramp_step_deg;
+extern volatile uint32_t g_qd4310_test_init_ramp_delay_ms;
+extern volatile float g_qd4310_test_balance_map_position_mm[QD4310_TEST_BALANCE_MAP_SIZE];
+extern volatile float g_qd4310_test_balance_map_angle_deg[QD4310_TEST_BALANCE_MAP_SIZE];
 extern volatile float g_qd4310_test_target_position_mm;
 extern volatile float g_qd4310_test_initial_angle_deg;
 extern volatile float g_qd4310_test_step_angle_deg;
 extern volatile float g_qd4310_test_deadband_mm;
 extern volatile float g_qd4310_test_kp_deg_per_mm;
 extern volatile float g_qd4310_test_kd_deg_per_mm_s;
+extern volatile float g_qd4310_test_ki_deg_per_mm_s;
+extern volatile float g_qd4310_test_max_integral_deg;
+extern volatile float g_qd4310_test_integral_velocity_limit_mm_s;
 extern volatile float g_qd4310_test_max_correction_deg;
 extern volatile float g_qd4310_test_max_angle_delta_deg;
 extern volatile float g_qd4310_test_velocity_lpf_alpha;
@@ -83,9 +106,14 @@ extern volatile float g_qd4310_test_ball_velocity_mm_s;
 extern volatile float g_qd4310_test_filtered_velocity_mm_s;
 extern volatile float g_qd4310_test_p_output_deg;
 extern volatile float g_qd4310_test_d_output_deg;
+extern volatile float g_qd4310_test_i_output_deg;
 extern volatile float g_qd4310_test_pd_output_deg;
+extern volatile float g_qd4310_test_pid_output_deg;
+extern volatile uint8_t g_qd4310_test_integral_enabled;
+extern volatile float g_qd4310_test_balance_base_angle_deg;
 extern volatile float g_qd4310_test_raw_target_angle_deg;
 extern volatile float g_qd4310_test_target_angle_deg;
+extern volatile float g_qd4310_test_motor_command_angle_deg;
 extern volatile float g_qd4310_test_last_angle_delta_deg;
 extern volatile float g_qd4310_test_last_step_deg;
 extern volatile uint8_t g_qd4310_test_angle_limit_blocked;
