@@ -249,10 +249,19 @@ void vLineRouteUpdate(void)
             break;
 
         case emLineRouteCurveBC:
-        case emLineRouteCurveDA:
             vLineTrackUpdateByTargetRpm(LINE_ROUTE_CURVE_TARGET_RPM);
             vLineRouteUpdateCurveAngle();
             if (g_fLineRouteCurveAngleDeg >= LINE_ROUTE_CURVE_ANGLE_DEG)
+            {
+                vLineRouteAdvanceState();
+            }
+            break;
+
+        case emLineRouteCurveDA:
+            vLineTrackUpdateByTargetRpm(LINE_ROUTE_CURVE_TARGET_RPM);
+            vLineRouteUpdateCurveAngle();
+            if (g_fLineRouteCurveAngleDeg >=
+                LINE_ROUTE_DA_FINISH_SEARCH_ANGLE_DEG)
             {
                 vLineRouteAdvanceState();
             }
