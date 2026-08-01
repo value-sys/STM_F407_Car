@@ -246,7 +246,7 @@ void StartDefaultTask(void *argument)
         vLineRouteUpdate();
         if (emLineRouteGetState() == emLineRouteStopped)
         {
-          vUiStop();
+          vUiFinishRun();
         }
       }
       else if (g_emDebugMode == emDebugModeAbCurveTest)
@@ -255,7 +255,7 @@ void StartDefaultTask(void *argument)
         vLineAbCurveUpdate();
         if (emLineAbCurveGetState() == emLineAbCurveStopped)
         {
-          vUiStop();
+          vUiFinishRun();
         }
       }
 

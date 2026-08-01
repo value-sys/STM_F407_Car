@@ -17,6 +17,7 @@ static uint32_t g_ui_start_tick;
 static uint32_t g_ui_elapsed_tenths;
 static uint32_t g_ui_rendered_tenths;
 static uint8_t g_ui_timer_running;
+static uint8_t g_ui_run_completed;
 static uint8_t g_ui_target_key1_previous_raw;
 static uint8_t g_ui_target_key3_previous_raw;
 static uint8_t g_ui_target_key1_long;
@@ -25,12 +26,15 @@ static uint32_t g_ui_target_key1_down_tick;
 static uint32_t g_ui_target_key3_down_tick;
 static uint32_t g_ui_target_key1_repeat_tick;
 static uint32_t g_ui_target_key3_repeat_tick;
+static uint8_t g_ui_chassis_start_allowed;
+static uint32_t g_ui_chassis_delay_start_tick;
 
 #define UI_TARGET_POSITION_STEP_MM 5.0f
 #define UI_TARGET_POSITION_MIN_MM  1.0f
 #define UI_TARGET_POSITION_MAX_MM  250.0f
 #define UI_LONG_PRESS_START_MS     500U
 #define UI_LONG_PRESS_REPEAT_MS    150U
+#define UI_QD4310_INIT_DELAY_MS    5000U
 
 volatile uint8_t g_ui_debug_key2_raw;
 volatile uint8_t g_ui_debug_key2_stable;
@@ -39,6 +43,34 @@ static uint8_t ui_mode_is_center_hold(void)
 {
     return (g_ui_mode == UI_MODE_AB_CENTER ||
             g_ui_mode == UI_MODE_LAP_CENTER) ? 1U : 0U;
+}
+
+static uint8_t ui_mode_requires_chassis_delay(void)
+{
+    return (g_ui_mode == UI_MODE_AB_CENTER ||
+            g_ui_mode == UI_MODE_LAP_CENTER ||
+            g_ui_mode == UI_MODE_LAP_TARGET) ? 1U : 0U;
+}
+
+static void ui_update_chassis_start_delay(void)
+{
+    if (g_ui_run_enabled == 0U ||
+        g_ui_run_completed != 0U ||
+        ui_mode_requires_chassis_delay() == 0U ||
+        g_ui_chassis_start_allowed != 0U) {
+        return;
+    }
+
+    if ((uint32_t)(osKernelGetTickCount() -
+                   g_ui_chassis_delay_start_tick) >=
+        UI_QD4310_INIT_DELAY_MS) {
+        g_ui_chassis_start_allowed = 1U;
+        g_ui_start_tick = osKernelGetTickCount();
+        g_ui_elapsed_tenths = 0U;
+        g_ui_rendered_tenths = 0U;
+        g_ui_timer_running = 1U;
+        g_ui_dirty = 1U;
+    }
 }
 
 static void ui_adjust_target_position(float delta_mm)
@@ -133,6 +165,17 @@ static void ui_stop_motion(void)
     vMotorControlStop();
 }
 
+static void ui_return_to_selection(void)
+{
+    vUiStop();
+    g_ui_mode = UI_MODE_STANDBY;
+    g_ui_run_enabled = 0U;
+    g_ui_run_completed = 0U;
+    g_ui_elapsed_tenths = 0U;
+    g_ui_rendered_tenths = 0U;
+    g_ui_dirty = 1U;
+}
+
 static uint32_t ui_elapsed_tenths_now(void)
 {
     const uint32_t tick_frequency = osKernelGetTickFreq();
@@ -164,6 +207,7 @@ static void ui_update_static_position_timing(void)
         g_ui_timer_running != 0U) {
         g_ui_elapsed_tenths = ui_elapsed_tenths_now();
         g_ui_timer_running = 0U;
+        g_ui_run_completed = 1U;
         g_ui_rendered_tenths = g_ui_elapsed_tenths;
         g_ui_dirty = 1U;
     }
@@ -175,7 +219,7 @@ static const char *ui_mode_name(eUiModeTdf mode)
         case UI_MODE_STANDBY: return "STANDBY";
         case UI_MODE_LINE_LAP: return "LINE 1 CIRCLE";
         case UI_MODE_STATIC_POSITION: return "STATIC POSITION";
-        case UI_MODE_AB_CENTER: return "A-B CENTER";
+        case UI_MODE_AB_CENTER: return "A TO B";
         case UI_MODE_LAP_CENTER: return "1 CIRCLE CENTER";
         case UI_MODE_LAP_TARGET: return "1 CIRCLE TARGET";
         default: return "UNKNOWN";
@@ -190,7 +234,9 @@ static void ui_render(void)
     const uint32_t tenths = g_ui_elapsed_tenths % 10U;
 
     if (g_ui_run_enabled != 0U) {
-        if (g_ui_mode == UI_MODE_LINE_LAP) {
+        if (g_ui_run_completed != 0U) {
+            state = "DONE";
+        } else if (g_ui_mode == UI_MODE_LINE_LAP) {
             state = "RUNNING";
         } else if (g_ui_mode == UI_MODE_STATIC_POSITION &&
                    g_qd4310_test_position_sequence_completed != 0U) {
@@ -207,7 +253,8 @@ static void ui_render(void)
     } else if (g_ui_mode != UI_MODE_STANDBY) {
         state = "READY";
     }
-    if (g_ui_mode == UI_MODE_LAP_TARGET) {
+    if (g_ui_mode == UI_MODE_LAP_TARGET &&
+        g_ui_run_completed == 0U) {
         const uint32_t target_mm =
             (uint32_t)(g_qd4310_test_target_position_mm + 0.5f);
         (void)snprintf(bottom_text, sizeof(bottom_text), "TARGET:%3luMM",
@@ -241,6 +288,9 @@ void vUiInit(void)
     g_ui_elapsed_tenths = 0U;
     g_ui_rendered_tenths = 0U;
     g_ui_timer_running = 0U;
+    g_ui_run_completed = 0U;
+    g_ui_chassis_start_allowed = 1U;
+    g_ui_chassis_delay_start_tick = 0U;
     g_ui_debug_key2_raw = 0U;
     g_ui_debug_key2_stable = 0U;
     g_qd4310_test_motion_authorized = 0U;
@@ -263,8 +313,10 @@ void vUiTaskUpdate(void)
      */
     /* The stop key bypasses debounce so motion is removed immediately. */
     if (g_ui_debug_key2_raw != 0U || g_ui_debug_key2_stable != 0U) {
-        vUiStop();
-    } else if ((ui_events & KEY_EVENT_1) != 0U) {
+        /* Key2 is the only exit from the completed-run display. */
+        ui_return_to_selection();
+    } else if ((ui_events & KEY_EVENT_1) != 0U &&
+               g_ui_run_completed == 0U) {
         if (g_ui_mode == UI_MODE_STANDBY) {
             g_ui_mode = UI_MODE_LINE_LAP;
         }
@@ -307,7 +359,12 @@ void vUiTaskUpdate(void)
             g_qd4310_test_position_sequence_completed = 0U;
             g_qd4310_test_motion_authorized = 1U;
         }
-        if (g_ui_mode == UI_MODE_STATIC_POSITION) {
+        if (ui_mode_requires_chassis_delay() != 0U) {
+            g_ui_chassis_start_allowed = 0U;
+            g_ui_chassis_delay_start_tick = osKernelGetTickCount();
+            g_ui_start_tick = 0U;
+            g_ui_timer_running = 0U;
+        } else if (g_ui_mode == UI_MODE_STATIC_POSITION) {
             g_ui_start_tick = 0U;
             g_ui_timer_running = 0U;
         } else {
@@ -316,18 +373,21 @@ void vUiTaskUpdate(void)
         }
         g_ui_elapsed_tenths = 0U;
         g_ui_rendered_tenths = 0U;
+        g_ui_run_completed = 0U;
         g_ui_run_enabled = 1U;
         g_ui_dirty = 1U;
     } else if ((ui_events & KEY_EVENT_2) != 0U) {
-        vUiStop();
-    } else if ((ui_events & KEY_EVENT_3) != 0U) {
+        ui_return_to_selection();
+    } else if ((ui_events & KEY_EVENT_3) != 0U &&
+               g_ui_run_completed == 0U) {
         vUiStop();
         g_ui_mode = (eUiModeTdf)((g_ui_mode + 1U) % UI_MODE_COUNT);
         g_ui_run_enabled = 0U;
         g_ui_elapsed_tenths = 0U;
         g_ui_rendered_tenths = 0U;
         g_ui_dirty = 1U;
-    } else if ((events & KEY_EVENT_4) != 0U) {
+    } else if ((events & KEY_EVENT_4) != 0U &&
+               g_ui_run_completed == 0U) {
         vUiStop();
         g_ui_mode = UI_MODE_STANDBY;
         g_ui_run_enabled = 0U;
@@ -336,6 +396,7 @@ void vUiTaskUpdate(void)
         g_ui_dirty = 1U;
     }
 
+    ui_update_chassis_start_delay();
     ui_update_static_position_timing();
 
     if (g_ui_run_enabled != 0U && g_ui_timer_running != 0U) {
@@ -360,6 +421,9 @@ void vUiStop(void)
     g_qd4310_test_position_sequence_confirm_count = 0U;
     g_qd4310_test_position_sequence_timer_started = 0U;
     g_qd4310_test_position_sequence_completed = 0U;
+    g_ui_chassis_start_allowed = 1U;
+    g_ui_chassis_delay_start_tick = 0U;
+    g_ui_run_completed = 0U;
     if (g_ui_run_enabled != 0U) {
         if (g_ui_timer_running != 0U) {
             g_ui_elapsed_tenths = ui_elapsed_tenths_now();
@@ -372,9 +436,36 @@ void vUiStop(void)
     ui_stop_motion();
 }
 
+void vUiFinishRun(void)
+{
+    vQd4310TestRequestStop();
+    g_qd4310_test_position_sequence_enabled = 0U;
+    g_qd4310_test_position_sequence_wait_center_enabled = 0U;
+    g_qd4310_test_position_sequence_phase = 0U;
+    g_qd4310_test_position_sequence_confirm_count = 0U;
+    g_qd4310_test_position_sequence_timer_started = 0U;
+    g_qd4310_test_position_sequence_completed = 0U;
+
+    if (g_ui_timer_running != 0U) {
+        g_ui_elapsed_tenths = ui_elapsed_tenths_now();
+    }
+    g_ui_timer_running = 0U;
+    g_ui_run_completed = 1U;
+    g_ui_chassis_start_allowed = 0U;
+    g_ui_chassis_delay_start_tick = 0U;
+    g_ui_rendered_tenths = g_ui_elapsed_tenths;
+    g_ui_dirty = 1U;
+    ui_stop_motion();
+}
+
 uint8_t ucUiRunEnabled(void)
 {
     return g_ui_run_enabled;
+}
+
+uint8_t ucUiChassisStartAllowed(void)
+{
+    return g_ui_chassis_start_allowed;
 }
 
 eUiModeTdf eUiGetMode(void)

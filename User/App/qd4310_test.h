@@ -38,9 +38,24 @@ extern "C" {
 #define QD4310_TEST_STUCK_VELOCITY_MM_S  20.0f
 #define QD4310_TEST_STUCK_RELEASE_VELOCITY_MM_S 30.0f
 #define QD4310_TEST_STUCK_CONFIRM_MS     200U
-#define QD4310_TEST_I_PULSE_DURATION_MS  200U
+#define QD4310_TEST_I_PULSE_DURATION_MS  260U
 #define QD4310_TEST_FEEDBACK_POLL_DEFAULT 0U
 #define QD4310_TEST_MANUAL_MODE_DEFAULT  1U
+#define QD4310_TEST_MOVING_DEADBAND_MM   QD4310_TEST_CENTER_DEADBAND_MM
+#define QD4310_TEST_MOVING_KP_DEG_PER_MM QD4310_TEST_KP_DEG_PER_MM
+#define QD4310_TEST_MOVING_KD_DEG_PER_MM_S QD4310_TEST_KD_DEG_PER_MM_S
+#define QD4310_TEST_MOVING_MAX_INTEGRAL_DEG QD4310_TEST_MAX_INTEGRAL_DEG
+#define QD4310_TEST_MOVING_MAX_CORRECTION_DEG QD4310_TEST_MAX_CORRECTION_DEG
+#define QD4310_TEST_MOVING_MAX_ANGLE_DELTA_DEG QD4310_TEST_MAX_ANGLE_DELTA_DEG
+#define QD4310_TEST_MOVING_MAX_I_ANGLE_DELTA_DEG \
+    QD4310_TEST_MAX_I_ANGLE_DELTA_DEG
+#define QD4310_TEST_MOVING_VELOCITY_LPF_ALPHA QD4310_TEST_VELOCITY_LPF_ALPHA
+#define QD4310_TEST_MOVING_STUCK_ERROR_MM QD4310_TEST_STUCK_ERROR_MM
+#define QD4310_TEST_MOVING_STUCK_VELOCITY_MM_S QD4310_TEST_STUCK_VELOCITY_MM_S
+#define QD4310_TEST_MOVING_STUCK_RELEASE_VELOCITY_MM_S \
+    QD4310_TEST_STUCK_RELEASE_VELOCITY_MM_S
+#define QD4310_TEST_MOVING_STUCK_CONFIRM_MS QD4310_TEST_STUCK_CONFIRM_MS
+#define QD4310_TEST_MOVING_I_PULSE_DURATION_MS QD4310_TEST_I_PULSE_DURATION_MS
 #define QD4310_TEST_POSITION_SEQUENCE_FIRST_TARGET_MM  175.0f
 #define QD4310_TEST_POSITION_SEQUENCE_SECOND_TARGET_MM 75.0f
 #define QD4310_TEST_POSITION_SEQUENCE_CENTER_TARGET_MM 125.0f
@@ -126,6 +141,23 @@ extern volatile float g_qd4310_test_stuck_velocity_mm_s;
 extern volatile float g_qd4310_test_stuck_release_velocity_mm_s;
 extern volatile uint32_t g_qd4310_test_stuck_confirm_ms;
 extern volatile uint32_t g_qd4310_test_i_pulse_duration_ms;
+
+/* Parameters used only while the chassis is moving in UI modes 3, 4 and 5.
+ * They intentionally start with the same values as the original set. */
+extern volatile uint8_t g_qd4310_test_motion_parameter_set_active;
+extern volatile float g_qd4310_test_moving_deadband_mm;
+extern volatile float g_qd4310_test_moving_kp_deg_per_mm;
+extern volatile float g_qd4310_test_moving_kd_deg_per_mm_s;
+extern volatile float g_qd4310_test_moving_max_integral_deg;
+extern volatile float g_qd4310_test_moving_max_correction_deg;
+extern volatile float g_qd4310_test_moving_max_angle_delta_deg;
+extern volatile float g_qd4310_test_moving_max_i_angle_delta_deg;
+extern volatile float g_qd4310_test_moving_velocity_lpf_alpha;
+extern volatile float g_qd4310_test_moving_stuck_error_mm;
+extern volatile float g_qd4310_test_moving_stuck_velocity_mm_s;
+extern volatile float g_qd4310_test_moving_stuck_release_velocity_mm_s;
+extern volatile uint32_t g_qd4310_test_moving_stuck_confirm_ms;
+extern volatile uint32_t g_qd4310_test_moving_i_pulse_duration_ms;
 /* 0: keep send-only mode; 1: wait for and decode QD4310 feedback frames. */
 extern volatile uint8_t g_qd4310_test_feedback_poll_enabled;
 
