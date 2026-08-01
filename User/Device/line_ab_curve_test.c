@@ -20,6 +20,8 @@ volatile uint32_t g_ulLineAbCurveElapsedMs;
 
 static int32_t s_lMotor1StartCount;
 static int32_t s_lMotor2StartCount;
+static uint8_t s_ucStartAccelerationActive;
+static uint32_t s_ulStartBlindElapsedMs;
 
 static float fLineAbCurveAbs(float fValue)
 {
@@ -41,13 +43,24 @@ static uint8_t ucLineAbCurveCountBits(uint8_t ucValue)
 static float fLineAbCurveUpdateCommandRpm(float fTargetRpm)
 {
     float fErrorRpm = fTargetRpm - g_fLineAbCurveCommandRpm;
-    float fRateRpmPerS = (fErrorRpm >= 0.0f) ?
-        LINE_AB_CURVE_ACCEL_RPM_PER_S : LINE_AB_CURVE_DECEL_RPM_PER_S;
+    float fRateRpmPerS;
     float fMaxStepRpm;
+
+    if ((fErrorRpm >= 0.0f) && (s_ucStartAccelerationActive != 0U))
+    {
+        fRateRpmPerS = LINE_AB_CURVE_START_ACCEL_RPM_PER_S;
+    }
+    else
+    {
+        fRateRpmPerS = (fErrorRpm >= 0.0f) ?
+            LINE_AB_CURVE_ACCEL_RPM_PER_S :
+            LINE_AB_CURVE_DECEL_RPM_PER_S;
+    }
 
     if (fRateRpmPerS <= 0.0f)
     {
         g_fLineAbCurveCommandRpm = fTargetRpm;
+        s_ucStartAccelerationActive = 0U;
         return g_fLineAbCurveCommandRpm;
     }
     fMaxStepRpm = fRateRpmPerS *
@@ -63,6 +76,7 @@ static float fLineAbCurveUpdateCommandRpm(float fTargetRpm)
     else
     {
         g_fLineAbCurveCommandRpm = fTargetRpm;
+        s_ucStartAccelerationActive = 0U;
     }
     return g_fLineAbCurveCommandRpm;
 }
@@ -131,8 +145,10 @@ static void vLineAbCurveUpdateDistance(void)
 void vLineAbCurveStart(void)
 {
     g_emLineAbCurveState = emLineAbCurveStraightAB;
-    g_fLineAbCurveCommandRpm = LINE_AB_CURVE_STRAIGHT_TARGET_RPM;
+    g_fLineAbCurveCommandRpm = 0.0f;
     g_ulLineAbCurveElapsedMs = 0U;
+    s_ucStartAccelerationActive = 1U;
+    s_ulStartBlindElapsedMs = 0U;
     vLineAbCurveCaptureStart();
     vLineTrackStart();
 }
@@ -143,6 +159,8 @@ void vLineAbCurveStop(void)
     g_fLineAbCurveDistanceMm = 0.0f;
     g_fLineAbCurveCommandRpm = 0.0f;
     g_ulLineAbCurveElapsedMs = 0U;
+    s_ucStartAccelerationActive = 0U;
+    s_ulStartBlindElapsedMs = 0U;
     vLineTrackStop();
     vChassisStop();
 }
@@ -165,6 +183,17 @@ void vLineAbCurveUpdate(void)
         vChassisStop();
         return;
     }
+
+    /* 起点宽黑线期间关闭灰度循迹，沿启动速度斜坡直行离开。 */
+    if (s_ulStartBlindElapsedMs < LINE_AB_CURVE_START_BLIND_TIME_MS)
+    {
+        vChassisMoveRpm(fLineAbCurveUpdateCommandRpm(
+            LINE_AB_CURVE_STRAIGHT_TARGET_RPM));
+        vLineAbCurveUpdateDistance();
+        s_ulStartBlindElapsedMs += LINE_TRACK_TASK_PERIOD_MS;
+        return;
+    }
+
     ucBlackCount = ucLineAbCurveCountBits(
         (uint8_t)(~pstGrayscale->stRunningParam.ucDigitalOutput));
 
@@ -181,6 +210,7 @@ void vLineAbCurveUpdate(void)
             if (g_fLineAbCurveDistanceMm >=
                 LINE_AB_CURVE_STRAIGHT_DISTANCE_MM)
             {
+                s_ucStartAccelerationActive = 0U;
                 g_emLineAbCurveState = emLineAbCurveTimedCurve;
                 g_ulLineAbCurveElapsedMs = 0U;
             }

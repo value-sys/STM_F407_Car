@@ -19,15 +19,22 @@
 #define LINE_TRACK_DEG_TO_RAD         (LINE_TRACK_PI / 180.0f)
 
 /* D1最靠近左电机，D8最靠近右电机，D4/D5位于中间。 */
-/* 直线权重较平缓，降低外侧传感器对直线循迹的影响。 */
-static const int8_t s_acStraightLinePosition[8] =
+/* 第2问直线权重。 */
+static const int8_t s_acQ2StraightLinePosition[8] =
     {100, -80, -50, -10, 10, 50, 80, 100};
-/* 进入弯道前忽略左侧D1-D4，只保留直线权重中的D5-D8。 */
-static const int8_t s_acCurveEntryLinePosition[8] =
+/* 第2问进入弯道前忽略左侧D1-D4。 */
+static const int8_t s_acQ2CurveEntryLinePosition[8] =
     {0, 0, 0, 0, 8, 20, 50, 50};
-/* 弯道扩大外侧权重差异，使车辆更早感知弯道方向。 */
-static const int8_t s_acCurveLinePosition[8] =
+/* 第2问弯道权重。 */
+static const int8_t s_acQ2CurveLinePosition[8] =
     {0, 0, 0, 15, 27, 35,39, 43};
+/* 第5/6问权重，初值复制第2问，可独立调节。 */
+static const int8_t s_acQ56StraightLinePosition[8] =
+    {100, -80, -50, -7, 7, 50, 80, 100};
+static const int8_t s_acQ56CurveEntryLinePosition[8] =
+    {0, 0, 0, 0, 8, 20, 50, 50};
+static const int8_t s_acQ56CurveLinePosition[8] =
+    {0, -5, -3, 0, 21, 25, 39, 42};
 
 static stLineTrackDeviceParamTdf s_stLineTrackDeviceParam;
 static PID_t s_stStraightGrayPid;
@@ -39,6 +46,15 @@ static uint8_t s_ucStraightYawCaptured;
 static uint8_t s_ucCurveEntryConstraint;
 static float s_fLastValidCurveSpeed;
 static float s_fCurveLineError;
+static stLineTrackStaticParamTdf s_stQ2StaticParam;
+static const int8_t *s_pcStraightLinePosition =
+    s_acQ2StraightLinePosition;
+static const int8_t *s_pcCurveEntryLinePosition =
+    s_acQ2CurveEntryLinePosition;
+static const int8_t *s_pcCurveLinePosition = s_acQ2CurveLinePosition;
+static float s_fCurveErrorFilterAlpha = LINE_TRACK_CURVE_ERROR_FILTER_ALPHA;
+static float s_fCurveFeedforwardOmega =
+    LINE_Q2_TRACK_CURVE_FEEDFORWARD_OMEGA_RAD_S;
 
 typedef enum
 {
@@ -64,10 +80,8 @@ static float fLineTrackLimit(float fValue, float fLimit)
     return fValue;
 }
 
-static uint8_t ucLineTrackCurveSampleIsValid(void)
+static uint8_t ucLineTrackCurveSampleIsValid(uint8_t ucBlackMask)
 {
-    uint8_t ucBlackMask = (uint8_t)(
-        ~ucGrayscaleSensorGetDigital(GRAYSCALE1));
     uint8_t ucShiftedMask = ucBlackMask;
 
     /* Zero or one black channel cannot contain a gap. */
@@ -124,6 +138,34 @@ static void vLineTrackPidInit(PID_t *pstPid, float fKp, float fKi,
     PID_Init(pstPid);
 }
 
+static void vLineTrackInitAllPids(void)
+{
+    const stLineTrackStaticParamTdf *pstStatic =
+        &s_stLineTrackDeviceParam.stStaticParam;
+
+    vLineTrackPidInit(&s_stStraightGrayPid,
+        pstStatic->fStraightGrayPidKp, pstStatic->fStraightGrayPidKi,
+        pstStatic->fStraightGrayPidKd,
+        pstStatic->fStraightMaxTargetYawRate);
+    vLineTrackPidInit(&s_stYawAnglePid,
+        pstStatic->fYawAnglePidKp, pstStatic->fYawAnglePidKi,
+        pstStatic->fYawAnglePidKd,
+        pstStatic->fStraightMaxTargetYawRate);
+    vLineTrackPidInit(&s_stStraightYawRatePid,
+        pstStatic->fStraightYawRatePidKp,
+        pstStatic->fStraightYawRatePidKi,
+        pstStatic->fStraightYawRatePidKd,
+        pstStatic->fStraightMaxTargetYawRate);
+    vLineTrackPidInit(&s_stCurveGrayPid,
+        pstStatic->fCurveGrayPidKp, pstStatic->fCurveGrayPidKi,
+        pstStatic->fCurveGrayPidKd, pstStatic->fCurveMaxTargetYawRate);
+    vLineTrackPidInit(&s_stCurveYawRatePid,
+        pstStatic->fCurveYawRatePidKp,
+        pstStatic->fCurveYawRatePidKi,
+        pstStatic->fCurveYawRatePidKd,
+        pstStatic->fCurveMaxTargetYawRate);
+}
+
 static void vLineTrackEnterMode(emLineTrackControlModeTdf emMode)
 {
     if (s_emControlMode == emMode)
@@ -152,16 +194,16 @@ static void vLineTrackUpdateSensorState(void)
     if ((s_emControlMode == emLineTrackControlGrayImu) &&
         (s_ucCurveEntryConstraint != 0U))
     {
-        pcLinePosition = s_acCurveEntryLinePosition;
+        pcLinePosition = s_pcCurveEntryLinePosition;
     }
     else if ((s_emControlMode == emLineTrackControlGrayOnly) ||
         (s_emControlMode == emLineTrackControlCurveImu))
     {
-        pcLinePosition = s_acCurveLinePosition;
+        pcLinePosition = s_pcCurveLinePosition;
     }
     else
     {
-        pcLinePosition = s_acStraightLinePosition;
+        pcLinePosition = s_pcStraightLinePosition;
     }
 
     /* 当前灰度数字量为1表示白色，取反后得到黑线位图。 */
@@ -239,6 +281,12 @@ static void vLineTrackApplyYawRateControl(float fCommandSpeed,
         pstStatic->fOuterControlWeight * pstRunning->fOuterControlOmega +
         pstStatic->fImuFeedbackWeight * pstRunning->fImuControlOmega,
         pstStatic->fMaxCorrectionOmega);
+    if (s_emControlMode == emLineTrackControlCurveImu)
+    {
+        pstRunning->fCorrectionOmega = fLineTrackLimit(
+            pstRunning->fCorrectionOmega + s_fCurveFeedforwardOmega,
+            pstStatic->fMaxCorrectionOmega);
+    }
     /* 底盘约定omega为正表示左转；直线末段只允许直行或右转。 */
     if ((s_ucCurveEntryConstraint != 0U) &&
         (pstRunning->fCorrectionOmega > 0.0f))
@@ -271,27 +319,70 @@ void vLineTrackDeviceInit(const stLineTrackStaticParamTdf *pstInit)
         sizeof(*pstInit));
     s_stLineTrackDeviceParam.stRunningParam.emState =
         emLineTrackStateDisabled;
-    vLineTrackPidInit(&s_stStraightGrayPid,
-        pstInit->fStraightGrayPidKp,
-        pstInit->fStraightGrayPidKi, pstInit->fStraightGrayPidKd,
-        pstInit->fStraightMaxTargetYawRate);
-    vLineTrackPidInit(&s_stYawAnglePid, pstInit->fYawAnglePidKp,
-        pstInit->fYawAnglePidKi, pstInit->fYawAnglePidKd,
-        pstInit->fStraightMaxTargetYawRate);
-    vLineTrackPidInit(&s_stStraightYawRatePid,
-        pstInit->fStraightYawRatePidKp,
-        pstInit->fStraightYawRatePidKi,
-        pstInit->fStraightYawRatePidKd,
-        pstInit->fStraightMaxTargetYawRate);
-    vLineTrackPidInit(&s_stCurveGrayPid,
-        pstInit->fCurveGrayPidKp,
-        pstInit->fCurveGrayPidKi, pstInit->fCurveGrayPidKd,
-        pstInit->fCurveMaxTargetYawRate);
-    vLineTrackPidInit(&s_stCurveYawRatePid,
-        pstInit->fCurveYawRatePidKp,
-        pstInit->fCurveYawRatePidKi,
-        pstInit->fCurveYawRatePidKd,
-        pstInit->fCurveMaxTargetYawRate);
+    memcpy(&s_stQ2StaticParam, pstInit, sizeof(s_stQ2StaticParam));
+    vLineTrackInitAllPids();
+}
+
+void vLineTrackSelectRouteProfile(emLineTrackRouteProfileTdf emProfile)
+{
+    s_stLineTrackDeviceParam.stStaticParam = s_stQ2StaticParam;
+    if (emProfile == emLineTrackRouteProfileQ56)
+    {
+        s_stLineTrackDeviceParam.stStaticParam.fCorrectionKp =
+            LINE_Q56_TRACK_CORRECTION_KP;
+        s_stLineTrackDeviceParam.stStaticParam.fMaxCorrectionOmega =
+            LINE_Q56_TRACK_MAX_CORRECTION_OMEGA;
+        s_stLineTrackDeviceParam.stStaticParam.fStraightGrayPidKp =
+            LINE_Q56_TRACK_STRAIGHT_GRAY_PID_KP;
+        s_stLineTrackDeviceParam.stStaticParam.fStraightGrayPidKi =
+            LINE_Q56_TRACK_STRAIGHT_GRAY_PID_KI;
+        s_stLineTrackDeviceParam.stStaticParam.fStraightGrayPidKd =
+            LINE_Q56_TRACK_STRAIGHT_GRAY_PID_KD;
+        s_stLineTrackDeviceParam.stStaticParam.fCurveGrayPidKp =
+            LINE_Q56_TRACK_CURVE_GRAY_PID_KP;
+        s_stLineTrackDeviceParam.stStaticParam.fCurveGrayPidKi =
+            LINE_Q56_TRACK_CURVE_GRAY_PID_KI;
+        s_stLineTrackDeviceParam.stStaticParam.fCurveGrayPidKd =
+            LINE_Q56_TRACK_CURVE_GRAY_PID_KD;
+        s_stLineTrackDeviceParam.stStaticParam.fStraightYawRatePidKp =
+            LINE_Q56_TRACK_STRAIGHT_YAW_RATE_PID_KP;
+        s_stLineTrackDeviceParam.stStaticParam.fStraightYawRatePidKi =
+            LINE_Q56_TRACK_STRAIGHT_YAW_RATE_PID_KI;
+        s_stLineTrackDeviceParam.stStaticParam.fStraightYawRatePidKd =
+            LINE_Q56_TRACK_STRAIGHT_YAW_RATE_PID_KD;
+        s_stLineTrackDeviceParam.stStaticParam.fCurveYawRatePidKp =
+            LINE_Q56_TRACK_CURVE_YAW_RATE_PID_KP;
+        s_stLineTrackDeviceParam.stStaticParam.fCurveYawRatePidKi =
+            LINE_Q56_TRACK_CURVE_YAW_RATE_PID_KI;
+        s_stLineTrackDeviceParam.stStaticParam.fCurveYawRatePidKd =
+            LINE_Q56_TRACK_CURVE_YAW_RATE_PID_KD;
+        s_stLineTrackDeviceParam.stStaticParam.fStraightMaxTargetYawRate =
+            LINE_Q56_TRACK_STRAIGHT_MAX_TARGET_YAW_RATE;
+        s_stLineTrackDeviceParam.stStaticParam.fCurveMaxTargetYawRate =
+            LINE_Q56_TRACK_CURVE_MAX_TARGET_YAW_RATE;
+        s_stLineTrackDeviceParam.stStaticParam.fOuterControlWeight =
+            LINE_Q56_TRACK_OUTER_CONTROL_WEIGHT;
+        s_stLineTrackDeviceParam.stStaticParam.fImuFeedbackWeight =
+            LINE_Q56_TRACK_IMU_FEEDBACK_WEIGHT;
+        s_pcStraightLinePosition = s_acQ56StraightLinePosition;
+        s_pcCurveEntryLinePosition = s_acQ56CurveEntryLinePosition;
+        s_pcCurveLinePosition = s_acQ56CurveLinePosition;
+        s_fCurveErrorFilterAlpha = LINE_Q56_TRACK_CURVE_ERROR_FILTER_ALPHA;
+        s_fCurveFeedforwardOmega =
+            LINE_Q56_TRACK_CURVE_FEEDFORWARD_OMEGA_RAD_S;
+    }
+    else
+    {
+        s_pcStraightLinePosition = s_acQ2StraightLinePosition;
+        s_pcCurveEntryLinePosition = s_acQ2CurveEntryLinePosition;
+        s_pcCurveLinePosition = s_acQ2CurveLinePosition;
+        s_fCurveErrorFilterAlpha = LINE_TRACK_CURVE_ERROR_FILTER_ALPHA;
+        s_fCurveFeedforwardOmega =
+            LINE_Q2_TRACK_CURVE_FEEDFORWARD_OMEGA_RAD_S;
+    }
+    vLineTrackInitAllPids();
+    s_emControlMode = emLineTrackControlDisabled;
+    s_fCurveLineError = 0.0f;
 }
 
 void vLineTrackStart(void)
@@ -322,6 +413,7 @@ void vLineTrackStop(void)
     s_ucCurveEntryConstraint = 0U;
     s_fLastValidCurveSpeed = 0.0f;
     s_fCurveLineError = 0.0f;
+    vLineTrackSelectRouteProfile(emLineTrackRouteProfileQ2);
     vChassisStop();
 }
 
@@ -340,14 +432,15 @@ static void vLineTrackUpdateInternal(float fBaseSpeed,
     {
         return;
     }
-    if ((ucCurveSearchWhenLost != 0U) &&
-        (ucLineTrackCurveSampleIsValid() == 0U))
-    {
-        return;
-    }
-
     vLineTrackEnterMode(emLineTrackControlGrayOnly);
     vLineTrackUpdateSensorState();
+    if (ucLineTrackCurveSampleIsValid(pstRunning->ucBlackMask) == 0U)
+    {
+        /* 直线或弯道中黑色通道断开，统一视为丢线。 */
+        pstRunning->emState = emLineTrackStateLost;
+        pstRunning->fLinePosition = 0.0f;
+        pstRunning->fLineError = 0.0f;
+    }
 
     if (pstRunning->emState == emLineTrackStateLost)
     {
@@ -369,6 +462,7 @@ static void vLineTrackUpdateInternal(float fBaseSpeed,
                 fBaseSpeed : fBaseSpeed * pstStatic->fLostSpeedScale;
             pstRunning->fLineError = (float)pstRunning->cLastDirection;
             pstRunning->fCorrectionOmega = fLineTrackLimit(
+                s_fCurveFeedforwardOmega +
                 LINE_TRACK_SENSOR_TURN_SIGN * fCorrectionKp *
                     pstRunning->fLineError,
                 fMaxCorrectionOmega);
@@ -386,12 +480,13 @@ static void vLineTrackUpdateInternal(float fBaseSpeed,
         fLineError = pstRunning->fLineError;
         if (ucCurveSearchWhenLost != 0U)
         {
-            s_fCurveLineError += LINE_TRACK_CURVE_ERROR_FILTER_ALPHA *
+            s_fCurveLineError += s_fCurveErrorFilterAlpha *
                 (fLineError - s_fCurveLineError);
             fLineError = s_fCurveLineError;
             pstRunning->fLineError = fLineError;
         }
         pstRunning->fCorrectionOmega = fLineTrackLimit(
+            s_fCurveFeedforwardOmega +
             LINE_TRACK_SENSOR_TURN_SIGN * fCorrectionKp * fLineError,
             fMaxCorrectionOmega);
         if (pstRunning->fLineError < 0.0f)
@@ -443,6 +538,13 @@ void vLineTrackImuUpdateByTargetRpm(float fTargetRpm)
 
     vLineTrackEnterMode(emLineTrackControlGrayImu);
     vLineTrackUpdateSensorState();
+    if (ucLineTrackCurveSampleIsValid(pstRunning->ucBlackMask) == 0U)
+    {
+        /* 直线中非连续黑色通道视为传感器跳变，并按丢线处理。 */
+        pstRunning->emState = emLineTrackStateLost;
+        pstRunning->fLinePosition = 0.0f;
+        pstRunning->fLineError = 0.0f;
+    }
     fCommandSpeed = fLineTrackRpmToLinearSpeed(fTargetRpm);
     pstRunning->fTargetYaw = 0.0f;
     pstRunning->fYawError = 0.0f;
@@ -496,6 +598,13 @@ void vLineTrackCurveImuUpdateByTargetRpm(float fTargetRpm)
 
     vLineTrackEnterMode(emLineTrackControlCurveImu);
     vLineTrackUpdateSensorState();
+    if (ucLineTrackCurveSampleIsValid(pstRunning->ucBlackMask) == 0U)
+    {
+        /* 弯道中非连续黑色通道视为传感器跳变，并按丢线处理。 */
+        pstRunning->emState = emLineTrackStateLost;
+        pstRunning->fLinePosition = 0.0f;
+        pstRunning->fLineError = 0.0f;
+    }
     fBaseSpeed = fLineTrackRpmToLinearSpeed(fTargetRpm);
     if (s_fLastValidCurveSpeed <= 0.0f)
     {

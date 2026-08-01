@@ -60,7 +60,9 @@ static void ui_render(void)
     if (g_ui_run_enabled != 0U) {
         state = ((g_ui_mode == UI_MODE_GRAY_TRACK_TEST) ||
                  (g_ui_mode == UI_MODE_LINE_LAP) ||
-                 (g_ui_mode == UI_MODE_AB_CURVE_TEST)) ?
+                 (g_ui_mode == UI_MODE_AB_CURVE_TEST) ||
+                 (g_ui_mode == UI_MODE_LAP_CENTER) ||
+                 (g_ui_mode == UI_MODE_LAP_TARGET)) ?
             "RUNNING" : "NO CTRL";
     } else if (g_ui_mode != UI_MODE_STANDBY) {
         state = "READY";
@@ -86,7 +88,8 @@ void vUiInit(void)
 {
     Key_Init();
     g_ui_run_enabled = 0U;
-    g_ui_mode = UI_MODE_STANDBY;
+    /* 当前默认测试第5/6问共用的整圈循迹状态机。 */
+    g_ui_mode = UI_MODE_LAP_CENTER;
     g_ui_dirty = 1U;
     g_ui_start_tick = 0U;
     g_ui_elapsed_tenths = 0U;
@@ -110,7 +113,7 @@ void vUiTaskUpdate(void)
         vUiStop();
     } else if ((events & KEY_EVENT_1) != 0U) {
         if (g_ui_mode == UI_MODE_STANDBY) {
-            g_ui_mode = UI_MODE_LINE_LAP;
+            g_ui_mode = UI_MODE_LAP_CENTER;
         }
         g_ui_start_tick = osKernelGetTickCount();
         g_ui_elapsed_tenths = 0U;

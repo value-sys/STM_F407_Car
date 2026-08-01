@@ -230,7 +230,7 @@ void StartDefaultTask(void *argument)
       }
       else if (g_emDebugMode == emDebugModeLineRoute)
       {
-        /* ABCD路线状态机：直线用灰度+IMU，弯道用纯灰度。 */
+        /* 第2/5/6问共用路线：直线用灰度+IMU，弯道用纯灰度。 */
         vLineRouteUpdate();
         if (emLineRouteGetState() == emLineRouteStopped)
         {
