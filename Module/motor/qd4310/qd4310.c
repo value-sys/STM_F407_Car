@@ -162,6 +162,7 @@ void qd4310_update(qd4310_t *motor, const uint8_t feedback[8])
     }
 
     motor->enabled = (feedback[0] & 0x01u) != 0u;
+    motor->state_raw = feedback[0];
 
     current_raw = (int16_t)(((uint16_t)feedback[3] << 8) | feedback[2]);
     speed_raw = (int16_t)(((uint16_t)feedback[5] << 8) | feedback[4]);

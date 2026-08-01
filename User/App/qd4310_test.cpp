@@ -29,10 +29,28 @@ volatile float g_qd4310_test_balance_map_position_mm[QD4310_TEST_BALANCE_MAP_SIZ
 };
 volatile float g_qd4310_test_balance_map_angle_deg[QD4310_TEST_BALANCE_MAP_SIZE] =
 {
-    -5.0f, -1.0f, 3.0f, 10.0f, 11.5f,
-    17.0f, 19.0f, 25.0f, 25.0f,
+    5.0f, 5.0f, 5.0f, 5.0f, 5.0f,
+    5.0f, 5.0f, 5.0f, 5.0f,
 };
 volatile float g_qd4310_test_target_position_mm = QD4310_TEST_TARGET_POSITION_MM;
+volatile uint8_t g_qd4310_test_position_sequence_enabled = 0U;
+volatile uint8_t g_qd4310_test_position_sequence_phase = 0U;
+volatile uint8_t g_qd4310_test_position_sequence_wait_center_enabled = 0U;
+volatile float g_qd4310_test_position_sequence_center_target_mm =
+    QD4310_TEST_POSITION_SEQUENCE_CENTER_TARGET_MM;
+volatile float g_qd4310_test_position_sequence_first_target_mm =
+    QD4310_TEST_POSITION_SEQUENCE_FIRST_TARGET_MM;
+volatile float g_qd4310_test_position_sequence_second_target_mm =
+    QD4310_TEST_POSITION_SEQUENCE_SECOND_TARGET_MM;
+volatile float g_qd4310_test_position_sequence_tolerance_mm =
+    QD4310_TEST_POSITION_SEQUENCE_TOLERANCE_MM;
+volatile uint32_t g_qd4310_test_position_sequence_confirm_frames =
+    QD4310_TEST_POSITION_SEQUENCE_CONFIRM_FRAMES;
+volatile uint32_t g_qd4310_test_position_sequence_confirm_count = 0U;
+volatile uint8_t g_qd4310_test_position_sequence_in_range = 0U;
+volatile uint8_t g_qd4310_test_position_sequence_first_target_reached = 0U;
+volatile uint8_t g_qd4310_test_position_sequence_timer_started = 0U;
+volatile uint8_t g_qd4310_test_position_sequence_completed = 0U;
 volatile float g_qd4310_test_initial_angle_deg = QD4310_TEST_INITIAL_ANGLE_DEG;
 volatile float g_qd4310_test_step_angle_deg = QD4310_TEST_STEP_ANGLE_DEG;
 volatile float g_qd4310_test_deadband_mm = QD4310_TEST_DEADBAND_MM;
@@ -45,17 +63,37 @@ volatile float g_qd4310_test_integral_velocity_limit_mm_s =
     QD4310_TEST_INTEGRAL_VEL_MM_S;
 volatile float g_qd4310_test_max_correction_deg = QD4310_TEST_MAX_CORRECTION_DEG;
 volatile float g_qd4310_test_max_angle_delta_deg = QD4310_TEST_MAX_ANGLE_DELTA_DEG;
+volatile float g_qd4310_test_max_i_angle_delta_deg =
+    QD4310_TEST_MAX_I_ANGLE_DELTA_DEG;
 volatile float g_qd4310_test_velocity_lpf_alpha = QD4310_TEST_VELOCITY_LPF_ALPHA;
 volatile int8_t g_qd4310_test_direction_sign = 1;
+volatile float g_qd4310_test_stuck_error_mm = QD4310_TEST_STUCK_ERROR_MM;
+volatile float g_qd4310_test_stuck_velocity_mm_s =
+    QD4310_TEST_STUCK_VELOCITY_MM_S;
+volatile float g_qd4310_test_stuck_release_velocity_mm_s =
+    QD4310_TEST_STUCK_RELEASE_VELOCITY_MM_S;
+volatile uint32_t g_qd4310_test_stuck_confirm_ms =
+    QD4310_TEST_STUCK_CONFIRM_MS;
+volatile uint32_t g_qd4310_test_i_pulse_duration_ms =
+    QD4310_TEST_I_PULSE_DURATION_MS;
+volatile uint8_t g_qd4310_test_feedback_poll_enabled =
+    QD4310_TEST_FEEDBACK_POLL_DEFAULT;
 
 volatile uint8_t g_qd4310_test_online = 0U;
 volatile uint8_t g_qd4310_test_enabled = 0U;
+volatile uint8_t g_qd4310_test_feedback_enabled = 0U;
 volatile uint8_t g_qd4310_test_state_raw = 0U;
+volatile uint8_t g_qd4310_test_feedback_valid = 0U;
+volatile float g_qd4310_test_feedback_angle_deg = 0.0f;
+volatile uint32_t g_qd4310_test_feedback_count = 0U;
+volatile uint32_t g_qd4310_test_feedback_error_count = 0U;
+volatile uint32_t g_qd4310_test_last_feedback_tick_ms = 0U;
 volatile float g_qd4310_test_angle_deg = 0.0f;
 volatile float g_qd4310_test_speed_rpm = 0.0f;
 volatile float g_qd4310_test_current_a = 0.0f;
 volatile float g_qd4310_test_actual_position_mm = 0.0f;
 volatile float g_qd4310_test_position_error_mm = 0.0f;
+volatile float g_qd4310_test_effective_error_mm = 0.0f;
 volatile float g_qd4310_test_ball_velocity_mm_s = 0.0f;
 volatile float g_qd4310_test_filtered_velocity_mm_s = 0.0f;
 volatile float g_qd4310_test_p_output_deg = 0.0f;
@@ -64,14 +102,29 @@ volatile float g_qd4310_test_i_output_deg = 0.0f;
 volatile float g_qd4310_test_pd_output_deg = 0.0f;
 volatile float g_qd4310_test_pid_output_deg = 0.0f;
 volatile uint8_t g_qd4310_test_integral_enabled = 0U;
+volatile uint8_t g_qd4310_test_stuck_active = 0U;
+volatile uint8_t g_qd4310_test_i_pulse_active = 0U;
+volatile uint8_t g_qd4310_test_pd_delta_limit_blocked = 0U;
+volatile uint8_t g_qd4310_test_i_delta_limit_blocked = 0U;
+volatile uint32_t g_qd4310_test_i_pulse_remaining_ms = 0U;
+volatile uint32_t g_qd4310_test_i_pulse_trigger_count = 0U;
 volatile float g_qd4310_test_balance_base_angle_deg =
     QD4310_TEST_INITIAL_ANGLE_DEG;
+volatile float g_qd4310_test_unclamped_target_angle_deg = 0.0f;
 volatile float g_qd4310_test_raw_target_angle_deg = 0.0f;
 volatile float g_qd4310_test_target_angle_deg = 0.0f;
 volatile float g_qd4310_test_motor_command_angle_deg = 0.0f;
 volatile float g_qd4310_test_last_angle_delta_deg = 0.0f;
 volatile float g_qd4310_test_last_step_deg = 0.0f;
 volatile uint8_t g_qd4310_test_angle_limit_blocked = 0U;
+volatile uint8_t g_qd4310_test_deadband_active = 0U;
+volatile uint8_t g_qd4310_test_output_limit_blocked = 0U;
+volatile uint8_t g_qd4310_test_delta_limit_blocked = 0U;
+volatile uint32_t g_qd4310_test_control_dt_ms = 0U;
+volatile uint32_t g_qd4310_test_control_sample_count = 0U;
+volatile uint32_t g_qd4310_test_wait_vision_count = 0U;
+volatile uint32_t g_qd4310_test_same_frame_skip_count = 0U;
+volatile uint32_t g_qd4310_test_last_control_tick_ms = 0U;
 volatile uint32_t g_qd4310_test_last_vision_sequence = 0U;
 volatile uint32_t g_qd4310_test_last_vision_age_ms = 0U;
 volatile uint8_t g_qd4310_test_last_vision_valid = 0U;
@@ -96,8 +149,12 @@ namespace
     float g_last_position_mm;
     uint32_t g_last_position_tick_ms;
     uint8_t g_previous_authorized;
+    uint8_t g_previous_position_sequence_enabled;
     uint8_t g_have_manual_angle_command;
     float g_last_manual_angle_command_deg;
+    uint32_t g_stuck_since_tick_ms;
+    uint32_t g_i_pulse_until_tick_ms;
+    int8_t g_i_pulse_direction_sign;
 
     float fAbs(float value)
     {
@@ -112,6 +169,21 @@ namespace
     HAL_StatusTypeDef eSendStep(float step_deg);
     HAL_StatusTypeDef eSendAngle(float angle_deg);
     void vRecordSend(HAL_StatusTypeDef status, uint8_t action);
+
+    void vCopyFeedbackDiagnostics()
+    {
+        g_qd4310_test_feedback_enabled =
+            g_qd4310_motor.enabled ? 1U : 0U;
+        g_qd4310_test_enabled = g_qd4310_test_feedback_enabled;
+        g_qd4310_test_state_raw = g_qd4310_motor.state_raw;
+        g_qd4310_test_current_a = g_qd4310_motor.current_a;
+        g_qd4310_test_speed_rpm = g_qd4310_motor.speed_rpm;
+        g_qd4310_test_feedback_angle_deg =
+            g_qd4310_motor.angle_rad * 180.0f / 3.14159265358979323846f;
+        g_qd4310_test_feedback_valid = 1U;
+        ++g_qd4310_test_feedback_count;
+        g_qd4310_test_last_feedback_tick_ms = HAL_GetTick();
+    }
 
     float fClamp(float value, float min_value, float max_value)
     {
@@ -349,17 +421,23 @@ namespace
 
     HAL_StatusTypeDef eSendEnable()
     {
-        return qd4310_send_only(&g_qd4310_motor, QD4310_CMD_ENABLE, 0);
+        return g_qd4310_test_feedback_poll_enabled != 0U
+                   ? qd4310_enable(&g_qd4310_motor)
+                   : qd4310_send_only(&g_qd4310_motor, QD4310_CMD_ENABLE, 0);
     }
 
     HAL_StatusTypeDef eSendSpeed(float speed_rpm)
     {
-        return qd4310_set_speed_only(&g_qd4310_motor, speed_rpm);
+        return g_qd4310_test_feedback_poll_enabled != 0U
+                   ? qd4310_set_speed(&g_qd4310_motor, speed_rpm)
+                   : qd4310_set_speed_only(&g_qd4310_motor, speed_rpm);
     }
 
     HAL_StatusTypeDef eSendDisable()
     {
-        return qd4310_send_only(&g_qd4310_motor, QD4310_CMD_DISABLE, 0);
+        return g_qd4310_test_feedback_poll_enabled != 0U
+                   ? qd4310_disable(&g_qd4310_motor)
+                   : qd4310_send_only(&g_qd4310_motor, QD4310_CMD_DISABLE, 0);
     }
 
     void vStopMotor(uint8_t state, uint8_t reason)
@@ -378,6 +456,19 @@ namespace
         g_qd4310_test_i_output_deg = 0.0f;
         g_qd4310_test_pid_output_deg = 0.0f;
         g_qd4310_test_integral_enabled = 0U;
+        g_qd4310_test_stuck_active = 0U;
+        g_qd4310_test_i_pulse_active = 0U;
+        g_qd4310_test_i_pulse_remaining_ms = 0U;
+        g_qd4310_test_position_sequence_phase = 0U;
+        g_qd4310_test_position_sequence_confirm_count = 0U;
+        g_qd4310_test_position_sequence_in_range = 0U;
+        g_qd4310_test_position_sequence_first_target_reached = 0U;
+        g_qd4310_test_position_sequence_timer_started = 0U;
+        g_qd4310_test_position_sequence_completed = 0U;
+        g_previous_position_sequence_enabled = 0U;
+        g_stuck_since_tick_ms = 0U;
+        g_i_pulse_until_tick_ms = 0U;
+        g_i_pulse_direction_sign = 0;
         g_qd4310_test_state = state;
         g_have_manual_angle_command = 0U;
         if (reason != QD4310_TEST_STOP_REASON_AUTH_LOST ||
@@ -390,22 +481,40 @@ namespace
 
     HAL_StatusTypeDef eSendStep(float step_deg)
     {
-        return qd4310_set_step_angle_only(&g_qd4310_motor,
-                                          step_deg * kDegToRad);
+        return g_qd4310_test_feedback_poll_enabled != 0U
+                   ? qd4310_set_step_angle(&g_qd4310_motor,
+                                           step_deg * kDegToRad)
+                   : qd4310_set_step_angle_only(&g_qd4310_motor,
+                                                step_deg * kDegToRad);
     }
 
     HAL_StatusTypeDef eSendAngle(float angle_deg)
     {
         const float motor_angle_deg = fWrap360(angle_deg);
         g_qd4310_test_motor_command_angle_deg = motor_angle_deg;
-        return qd4310_set_angle_only(&g_qd4310_motor,
-                                     motor_angle_deg * kDegToRad);
+        return g_qd4310_test_feedback_poll_enabled != 0U
+                   ? qd4310_set_angle(&g_qd4310_motor,
+                                      motor_angle_deg * kDegToRad)
+                   : qd4310_set_angle_only(&g_qd4310_motor,
+                                           motor_angle_deg * kDegToRad);
     }
 
     void vRecordSend(HAL_StatusTypeDef status, uint8_t action)
     {
         g_qd4310_test_last_status = static_cast<uint8_t>(status);
         g_qd4310_test_last_action = action;
+        if (g_qd4310_test_feedback_poll_enabled != 0U)
+        {
+            if (status == HAL_OK)
+            {
+                vCopyFeedbackDiagnostics();
+            }
+            else
+            {
+                g_qd4310_test_feedback_valid = 0U;
+                ++g_qd4310_test_feedback_error_count;
+            }
+        }
         vCopyTxDiagnostics();
         if (status == HAL_OK)
         {
@@ -434,6 +543,128 @@ namespace
         g_qd4310_test_last_vision_confidence = data.confidence;
     }
 
+    void vUpdatePositionSequenceSwitch()
+    {
+        const uint8_t enabled =
+            g_qd4310_test_position_sequence_enabled != 0U ? 1U : 0U;
+
+        if (enabled != 0U &&
+            (g_previous_position_sequence_enabled == 0U ||
+             g_qd4310_test_position_sequence_phase == 0U))
+        {
+            g_qd4310_test_position_sequence_phase =
+                g_qd4310_test_position_sequence_wait_center_enabled != 0U
+                    ? 3U
+                    : 1U;
+            g_qd4310_test_position_sequence_confirm_count = 0U;
+            g_qd4310_test_position_sequence_in_range = 0U;
+            g_qd4310_test_position_sequence_first_target_reached = 0U;
+            g_qd4310_test_position_sequence_timer_started = 0U;
+            g_qd4310_test_position_sequence_completed = 0U;
+            g_qd4310_test_target_position_mm =
+                g_qd4310_test_position_sequence_phase == 3U
+                    ? g_qd4310_test_position_sequence_center_target_mm
+                    : g_qd4310_test_position_sequence_first_target_mm;
+            g_qd4310_test_position_error_mm =
+                g_qd4310_test_target_position_mm -
+                g_qd4310_test_actual_position_mm;
+        }
+        else if (enabled == 0U &&
+                 g_previous_position_sequence_enabled != 0U)
+        {
+            g_qd4310_test_position_sequence_phase = 0U;
+            g_qd4310_test_position_sequence_confirm_count = 0U;
+            g_qd4310_test_position_sequence_in_range = 0U;
+            g_qd4310_test_position_sequence_first_target_reached = 0U;
+            g_qd4310_test_position_sequence_timer_started = 0U;
+            g_qd4310_test_position_sequence_completed = 0U;
+        }
+
+        g_previous_position_sequence_enabled = enabled;
+    }
+
+    void vUpdatePositionSequenceFrame(float actual_position_mm)
+    {
+        if (g_qd4310_test_position_sequence_enabled == 0U ||
+            g_qd4310_test_position_sequence_phase == 0U)
+        {
+            return;
+        }
+
+        const float tolerance = fAbs(
+            g_qd4310_test_position_sequence_tolerance_mm);
+        const uint8_t phase = g_qd4310_test_position_sequence_phase;
+        const float target =
+            phase == 3U
+                ? g_qd4310_test_position_sequence_center_target_mm
+                : (phase == 1U
+                       ? g_qd4310_test_position_sequence_first_target_mm
+                       : g_qd4310_test_position_sequence_second_target_mm);
+        g_qd4310_test_target_position_mm = target;
+        const bool in_range = fAbs(actual_position_mm - target) <= tolerance;
+        g_qd4310_test_position_sequence_in_range = in_range ? 1U : 0U;
+
+        if (phase == 3U)
+        {
+            if (in_range)
+            {
+                g_qd4310_test_position_sequence_phase = 1U;
+                g_qd4310_test_position_sequence_timer_started = 1U;
+                g_qd4310_test_position_sequence_confirm_count = 0U;
+                g_qd4310_test_position_sequence_in_range = 0U;
+                g_qd4310_test_target_position_mm =
+                    g_qd4310_test_position_sequence_first_target_mm;
+            }
+        }
+        else if (phase == 1U || phase == 2U)
+        {
+            if (in_range)
+            {
+                ++g_qd4310_test_position_sequence_confirm_count;
+            }
+            else
+            {
+                g_qd4310_test_position_sequence_confirm_count = 0U;
+            }
+
+            uint32_t required_frames =
+                g_qd4310_test_position_sequence_confirm_frames;
+            if (required_frames == 0U)
+            {
+                required_frames = 1U;
+            }
+
+            if (g_qd4310_test_position_sequence_confirm_count >=
+                required_frames)
+            {
+                if (phase == 1U)
+                {
+                    g_qd4310_test_position_sequence_phase = 2U;
+                    g_qd4310_test_position_sequence_first_target_reached =
+                        1U;
+                    g_qd4310_test_position_sequence_confirm_count = 0U;
+                    g_qd4310_test_position_sequence_in_range = 0U;
+                    g_qd4310_test_target_position_mm =
+                        g_qd4310_test_position_sequence_second_target_mm;
+                }
+                else
+                {
+                    g_qd4310_test_position_sequence_phase = 4U;
+                    g_qd4310_test_position_sequence_completed = 1U;
+                    g_qd4310_test_position_sequence_in_range = 1U;
+                }
+            }
+        }
+        else if (phase == 4U)
+        {
+            g_qd4310_test_target_position_mm =
+                g_qd4310_test_position_sequence_second_target_mm;
+        }
+
+        g_qd4310_test_position_error_mm =
+            g_qd4310_test_target_position_mm - actual_position_mm;
+    }
+
     void vInitializeMotor()
     {
         /* No motor feedback is used. Initialization therefore starts a new
@@ -442,6 +673,7 @@ namespace
         g_qd4310_test_angle_deg = QD4310_TEST_BOOT_ANGLE_DEG;
         g_qd4310_test_angle_limit_blocked = 0U;
         g_qd4310_test_stop_reason = QD4310_TEST_STOP_REASON_NONE;
+        g_qd4310_test_effective_error_mm = 0.0f;
         g_qd4310_test_ball_velocity_mm_s = 0.0f;
         g_qd4310_test_filtered_velocity_mm_s = 0.0f;
         g_qd4310_test_p_output_deg = 0.0f;
@@ -450,11 +682,29 @@ namespace
         g_qd4310_test_pd_output_deg = 0.0f;
         g_qd4310_test_pid_output_deg = 0.0f;
         g_qd4310_test_integral_enabled = 0U;
+        g_qd4310_test_stuck_active = 0U;
+        g_qd4310_test_i_pulse_active = 0U;
+        g_qd4310_test_i_pulse_remaining_ms = 0U;
+        g_qd4310_test_pd_delta_limit_blocked = 0U;
+        g_qd4310_test_i_delta_limit_blocked = 0U;
+        g_stuck_since_tick_ms = 0U;
+        g_i_pulse_until_tick_ms = 0U;
+        g_i_pulse_direction_sign = 0;
         g_qd4310_test_balance_base_angle_deg =
+            g_qd4310_test_initial_angle_deg;
+        g_qd4310_test_unclamped_target_angle_deg =
             g_qd4310_test_initial_angle_deg;
         g_qd4310_test_raw_target_angle_deg = g_qd4310_test_initial_angle_deg;
         g_qd4310_test_target_angle_deg = g_qd4310_test_initial_angle_deg;
         g_qd4310_test_last_angle_delta_deg = 0.0f;
+        g_qd4310_test_deadband_active = 0U;
+        g_qd4310_test_output_limit_blocked = 0U;
+        g_qd4310_test_delta_limit_blocked = 0U;
+        g_qd4310_test_control_dt_ms = 0U;
+        g_qd4310_test_control_sample_count = 0U;
+        g_qd4310_test_wait_vision_count = 0U;
+        g_qd4310_test_same_frame_skip_count = 0U;
+        g_qd4310_test_last_control_tick_ms = 0U;
         g_have_control_frame = 0U;
         g_last_control_frame_count = 0U;
         g_have_velocity_sample = 0U;
@@ -528,6 +778,7 @@ namespace
         if (have_vision_data == 0U)
         {
             g_qd4310_test_last_step_deg = 0.0f;
+            ++g_qd4310_test_wait_vision_count;
             g_qd4310_test_state = QD4310_TEST_STATE_WAIT_VISION;
             return;
         }
@@ -535,11 +786,39 @@ namespace
         if (g_have_control_frame != 0U &&
             data.receive_count == g_last_control_frame_count)
         {
+            ++g_qd4310_test_same_frame_skip_count;
             return;
         }
 
         g_last_control_frame_count = data.receive_count;
         g_have_control_frame = 1U;
+        ++g_qd4310_test_control_sample_count;
+        g_qd4310_test_last_control_tick_ms = now;
+
+        const uint8_t sequence_phase_before =
+            g_qd4310_test_position_sequence_phase;
+        vUpdatePositionSequenceFrame(g_qd4310_test_actual_position_mm);
+
+        /* Static-position mode starts from the calibrated 5 deg angle. Do
+         * not steer the ball toward center while waiting for the operator's
+         * initial placement at 125 mm. */
+        if (sequence_phase_before == 3U &&
+            g_qd4310_test_position_sequence_phase == 3U)
+        {
+            g_qd4310_test_p_output_deg = 0.0f;
+            g_qd4310_test_d_output_deg = 0.0f;
+            g_qd4310_test_i_output_deg = 0.0f;
+            g_qd4310_test_pd_output_deg = 0.0f;
+            g_qd4310_test_pid_output_deg = 0.0f;
+            g_qd4310_test_integral_enabled = 0U;
+            g_qd4310_test_target_angle_deg =
+                g_qd4310_test_angle_deg;
+            g_qd4310_test_motor_command_angle_deg =
+                g_qd4310_test_angle_deg;
+            g_qd4310_test_last_angle_delta_deg = 0.0f;
+            g_qd4310_test_last_step_deg = 0.0f;
+            return;
+        }
 
         const float error = g_qd4310_test_position_error_mm;
         const float deadband = fAbs(g_qd4310_test_deadband_mm);
@@ -557,6 +836,9 @@ namespace
         {
             effective_error = error + deadband;
         }
+        g_qd4310_test_effective_error_mm = effective_error;
+        g_qd4310_test_deadband_active =
+            fAbs(error) <= deadband ? 1U : 0U;
 
         if (g_have_velocity_sample != 0U &&
             sample_tick != g_last_position_tick_ms)
@@ -566,6 +848,7 @@ namespace
                             1000.0f / static_cast<float>(dt_ms);
         }
         g_have_velocity_sample = 1U;
+        g_qd4310_test_control_dt_ms = dt_ms;
         g_last_position_mm = actual_position_mm;
         g_last_position_tick_ms = sample_tick;
 
@@ -585,38 +868,115 @@ namespace
         g_qd4310_test_pd_output_deg =
             g_qd4310_test_p_output_deg + g_qd4310_test_d_output_deg;
 
-        const float integral_velocity_limit =
-            fAbs(g_qd4310_test_integral_velocity_limit_mm_s);
-        if (fAbs(g_qd4310_test_ball_velocity_mm_s) <=
-                integral_velocity_limit &&
+        /* I is used as a finite breakaway pulse, not as a continuously
+         * accumulating integral. PD remains the normal smooth controller. */
+        const float stuck_error_limit = fAbs(g_qd4310_test_stuck_error_mm);
+        const float stuck_velocity_limit =
+            fAbs(g_qd4310_test_stuck_velocity_mm_s);
+        const float release_velocity_limit = fAbs(
+            g_qd4310_test_stuck_release_velocity_mm_s);
+        const bool error_is_large = fAbs(error) > stuck_error_limit;
+        const bool velocity_is_low =
             fAbs(g_qd4310_test_filtered_velocity_mm_s) <=
-                integral_velocity_limit &&
-            fAbs(effective_error) > 0.001f)
+            stuck_velocity_limit;
+
+        if (error_is_large && velocity_is_low)
         {
-            const float dt_s =
-                fClamp(static_cast<float>(dt_ms) * 0.001f, 0.0f, 0.1f);
-            const float max_integral = fAbs(g_qd4310_test_max_integral_deg);
-            g_qd4310_test_i_output_deg =
-                fClamp(g_qd4310_test_i_output_deg +
-                           control_sign * g_qd4310_test_ki_deg_per_mm_s *
-                               effective_error * dt_s,
-                       -max_integral,
-                       max_integral);
-            g_qd4310_test_integral_enabled = 1U;
+            if (g_stuck_since_tick_ms == 0U)
+            {
+                g_stuck_since_tick_ms = now;
+            }
+
+            g_qd4310_test_stuck_active =
+                (now - g_stuck_since_tick_ms >=
+                 g_qd4310_test_stuck_confirm_ms)
+                    ? 1U
+                    : 0U;
         }
         else
         {
-            g_qd4310_test_i_output_deg = 0.0f;
-            g_qd4310_test_integral_enabled = 0U;
+            g_stuck_since_tick_ms = 0U;
+            g_qd4310_test_stuck_active = 0U;
         }
 
-        float control_output = g_qd4310_test_pd_output_deg +
-                               g_qd4310_test_i_output_deg;
+        if (g_qd4310_test_i_pulse_active != 0U)
+        {
+            const bool pulse_expired =
+                static_cast<int32_t>(now - g_i_pulse_until_tick_ms) >= 0;
+            const bool ball_has_started =
+                fAbs(g_qd4310_test_filtered_velocity_mm_s) >=
+                release_velocity_limit;
+            const bool error_reversed =
+                (g_i_pulse_direction_sign != 0) &&
+                (error * static_cast<float>(g_i_pulse_direction_sign) <
+                 0.0f);
+
+            if (pulse_expired || ball_has_started || error_reversed)
+            {
+                g_qd4310_test_i_pulse_active = 0U;
+                g_i_pulse_until_tick_ms = 0U;
+                /* Require another full confirmation interval before a
+                 * second pulse after any release condition. */
+                g_stuck_since_tick_ms = now;
+                g_qd4310_test_stuck_active = 0U;
+            }
+        }
+
+        if (g_qd4310_test_i_pulse_active == 0U &&
+            g_qd4310_test_stuck_active != 0U)
+        {
+            g_i_pulse_direction_sign =
+                effective_error >= 0.0f ? 1 : -1;
+            g_qd4310_test_i_pulse_active = 1U;
+            g_i_pulse_until_tick_ms =
+                now + g_qd4310_test_i_pulse_duration_ms;
+            ++g_qd4310_test_i_pulse_trigger_count;
+        }
+
+        const float max_integral = fAbs(g_qd4310_test_max_integral_deg);
+        const float i_pulse_target_deg =
+            g_qd4310_test_i_pulse_active != 0U
+                ? control_sign *
+                      static_cast<float>(g_i_pulse_direction_sign) *
+                      max_integral
+                : 0.0f;
+        const float max_i_delta =
+            fAbs(g_qd4310_test_max_i_angle_delta_deg);
+        const float requested_i_delta =
+            i_pulse_target_deg - g_qd4310_test_i_output_deg;
+        const float i_delta = fClamp(requested_i_delta,
+                                     -max_i_delta,
+                                     max_i_delta);
+        g_qd4310_test_i_delta_limit_blocked =
+            fAbs(i_delta - requested_i_delta) > 0.0001f ? 1U : 0U;
+        g_qd4310_test_i_output_deg += i_delta;
+        g_qd4310_test_integral_enabled =
+            g_qd4310_test_i_pulse_active != 0U ||
+            fAbs(g_qd4310_test_i_output_deg) > 0.0001f ? 1U : 0U;
+
+        if (g_qd4310_test_i_pulse_active != 0U &&
+            now < g_i_pulse_until_tick_ms)
+        {
+            g_qd4310_test_i_pulse_remaining_ms =
+                g_i_pulse_until_tick_ms - now;
+        }
+        else
+        {
+            g_qd4310_test_i_pulse_remaining_ms = 0U;
+        }
+
+        const float unclamped_control_output =
+            g_qd4310_test_pd_output_deg + g_qd4310_test_i_output_deg;
+        float control_output = unclamped_control_output;
         const float max_correction = fAbs(g_qd4310_test_max_correction_deg);
         control_output = fClamp(control_output,
                                 -max_correction,
                                 max_correction);
         g_qd4310_test_pid_output_deg = control_output;
+        g_qd4310_test_output_limit_blocked =
+            fAbs(control_output - unclamped_control_output) > 0.0001f
+                ? 1U
+                : 0U;
 
         if (g_qd4310_test_balance_map_enabled != 0U)
         {
@@ -631,26 +991,46 @@ namespace
 
         const float unclamped_target_angle_deg =
             g_qd4310_test_balance_base_angle_deg + control_output;
+        g_qd4310_test_unclamped_target_angle_deg =
+            unclamped_target_angle_deg;
         g_qd4310_test_raw_target_angle_deg =
             fClamp(unclamped_target_angle_deg,
                    QD4310_TEST_MIN_ANGLE_DEG,
                    QD4310_TEST_MAX_ANGLE_DEG);
 
-        const float max_delta = fAbs(g_qd4310_test_max_angle_delta_deg);
-        const float angle_delta =
-            fClamp(g_qd4310_test_raw_target_angle_deg -
-                       g_qd4310_test_angle_deg,
-                   -max_delta,
-                   max_delta);
-        g_qd4310_test_last_angle_delta_deg = angle_delta;
-        g_qd4310_test_last_step_deg = angle_delta;
-        g_qd4310_test_target_angle_deg =
-            fClamp(g_qd4310_test_angle_deg + angle_delta,
+        /* Apply two independent angle paths. The PD path remains limited to
+         * the normal smooth step; the I pulse has its own larger limit. */
+        const float pd_target_angle_deg =
+            fClamp(g_qd4310_test_balance_base_angle_deg +
+                       g_qd4310_test_pd_output_deg,
                    QD4310_TEST_MIN_ANGLE_DEG,
                    QD4310_TEST_MAX_ANGLE_DEG);
+        const float max_pd_delta =
+            fAbs(g_qd4310_test_max_angle_delta_deg);
+        const float requested_pd_delta =
+            pd_target_angle_deg - g_qd4310_test_angle_deg;
+        const float pd_delta = fClamp(requested_pd_delta,
+                                      -max_pd_delta,
+                                      max_pd_delta);
+        g_qd4310_test_pd_delta_limit_blocked =
+            fAbs(pd_delta - requested_pd_delta) > 0.0001f ? 1U : 0U;
+
+        const float next_angle_unclamped =
+            g_qd4310_test_angle_deg + pd_delta + i_delta;
+        const float next_angle_deg = fClamp(next_angle_unclamped,
+                                            QD4310_TEST_MIN_ANGLE_DEG,
+                                            QD4310_TEST_MAX_ANGLE_DEG);
+        const float angle_delta = next_angle_deg - g_qd4310_test_angle_deg;
+        g_qd4310_test_delta_limit_blocked =
+            g_qd4310_test_pd_delta_limit_blocked != 0U ||
+            g_qd4310_test_i_delta_limit_blocked != 0U;
+        g_qd4310_test_last_angle_delta_deg = angle_delta;
+        g_qd4310_test_last_step_deg = angle_delta;
+        g_qd4310_test_target_angle_deg = next_angle_deg;
         g_qd4310_test_angle_limit_blocked =
             (g_qd4310_test_raw_target_angle_deg !=
-             unclamped_target_angle_deg) ? 1U : 0U;
+             unclamped_target_angle_deg) ||
+            (next_angle_deg != next_angle_unclamped) ? 1U : 0U;
 
         const HAL_StatusTypeDef status =
             eSendAngle(g_qd4310_test_target_angle_deg);
@@ -793,9 +1173,28 @@ namespace
                 g_qd4310_test_last_angle_delta_deg = 0.0f;
                 g_qd4310_test_ball_velocity_mm_s = 0.0f;
                 g_qd4310_test_filtered_velocity_mm_s = 0.0f;
+                g_qd4310_test_effective_error_mm = 0.0f;
                 g_qd4310_test_i_output_deg = 0.0f;
                 g_qd4310_test_pid_output_deg = 0.0f;
                 g_qd4310_test_integral_enabled = 0U;
+                g_qd4310_test_stuck_active = 0U;
+                g_qd4310_test_i_pulse_active = 0U;
+                g_qd4310_test_i_pulse_remaining_ms = 0U;
+                g_qd4310_test_pd_delta_limit_blocked = 0U;
+                g_qd4310_test_i_delta_limit_blocked = 0U;
+                g_stuck_since_tick_ms = 0U;
+                g_i_pulse_until_tick_ms = 0U;
+                g_i_pulse_direction_sign = 0;
+                g_qd4310_test_unclamped_target_angle_deg =
+                    g_qd4310_test_initial_angle_deg;
+                g_qd4310_test_deadband_active = 0U;
+                g_qd4310_test_output_limit_blocked = 0U;
+                g_qd4310_test_delta_limit_blocked = 0U;
+                g_qd4310_test_control_dt_ms = 0U;
+                g_qd4310_test_control_sample_count = 0U;
+                g_qd4310_test_wait_vision_count = 0U;
+                g_qd4310_test_same_frame_skip_count = 0U;
+                g_qd4310_test_last_control_tick_ms = 0U;
                 g_have_control_frame = 0U;
                 g_last_control_frame_count = 0U;
                 g_have_velocity_sample = 0U;
@@ -839,6 +1238,8 @@ void vQd4310TestTask(void *argument)
 
     for (;;)
     {
+        vUpdatePositionSequenceSwitch();
+
         stVisionBallData latest_vision_data;
         if (ucVisionGetLatest(&latest_vision_data) != 0U)
         {

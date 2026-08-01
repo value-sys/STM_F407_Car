@@ -16,9 +16,16 @@ static uint8_t g_ui_dirty;
 static uint32_t g_ui_start_tick;
 static uint32_t g_ui_elapsed_tenths;
 static uint32_t g_ui_rendered_tenths;
+static uint8_t g_ui_timer_running;
 
 volatile uint8_t g_ui_debug_key2_raw;
 volatile uint8_t g_ui_debug_key2_stable;
+
+static uint8_t ui_mode_is_center_hold(void)
+{
+    return (g_ui_mode == UI_MODE_AB_CENTER ||
+            g_ui_mode == UI_MODE_LAP_CENTER) ? 1U : 0U;
+}
 
 static void ui_stop_motion(void)
 {
@@ -37,6 +44,31 @@ static uint32_t ui_elapsed_tenths_now(void)
         return 0U;
     }
     return (uint32_t)(((uint64_t)elapsed_ticks * 10U) / tick_frequency);
+}
+
+static void ui_update_static_position_timing(void)
+{
+    if (g_ui_mode != UI_MODE_STATIC_POSITION ||
+        g_ui_run_enabled == 0U) {
+        return;
+    }
+
+    if (g_qd4310_test_position_sequence_timer_started != 0U &&
+        g_ui_timer_running == 0U) {
+        g_ui_start_tick = osKernelGetTickCount();
+        g_ui_elapsed_tenths = 0U;
+        g_ui_rendered_tenths = 0U;
+        g_ui_timer_running = 1U;
+        g_ui_dirty = 1U;
+    }
+
+    if (g_qd4310_test_position_sequence_completed != 0U &&
+        g_ui_timer_running != 0U) {
+        g_ui_elapsed_tenths = ui_elapsed_tenths_now();
+        g_ui_timer_running = 0U;
+        g_ui_rendered_tenths = g_ui_elapsed_tenths;
+        g_ui_dirty = 1U;
+    }
 }
 
 static const char *ui_mode_name(eUiModeTdf mode)
@@ -62,7 +94,12 @@ static void ui_render(void)
     if (g_ui_run_enabled != 0U) {
         if (g_ui_mode == UI_MODE_LINE_LAP) {
             state = "RUNNING";
+        } else if (g_ui_mode == UI_MODE_STATIC_POSITION &&
+                   g_qd4310_test_position_sequence_completed != 0U) {
+            state = "DONE";
         } else if (g_ui_mode == UI_MODE_STATIC_POSITION) {
+            state = "BALANCE";
+        } else if (ui_mode_is_center_hold() != 0U) {
             state = "BALANCE";
         } else {
             state = "NO CTRL";
@@ -96,6 +133,7 @@ void vUiInit(void)
     g_ui_start_tick = 0U;
     g_ui_elapsed_tenths = 0U;
     g_ui_rendered_tenths = 0U;
+    g_ui_timer_running = 0U;
     g_ui_debug_key2_raw = 0U;
     g_ui_debug_key2_stable = 0U;
     g_qd4310_test_motion_authorized = 0U;
@@ -125,9 +163,35 @@ void vUiTaskUpdate(void)
         if (g_ui_mode == UI_MODE_STATIC_POSITION) {
             /* Static-position mode owns the QD4310 run request. */
             g_qd4310_test_manual_mode = 0U;
+            g_qd4310_test_initial_angle_deg = QD4310_TEST_INITIAL_ANGLE_DEG;
+            g_qd4310_test_position_sequence_phase = 0U;
+            g_qd4310_test_position_sequence_confirm_count = 0U;
+            g_qd4310_test_position_sequence_timer_started = 0U;
+            g_qd4310_test_position_sequence_completed = 0U;
+            g_qd4310_test_position_sequence_wait_center_enabled = 1U;
+            g_qd4310_test_position_sequence_enabled = 1U;
             g_qd4310_test_motion_authorized = 1U;
         }
-        g_ui_start_tick = osKernelGetTickCount();
+        if (ui_mode_is_center_hold() != 0U) {
+            /* Modes 4 and 5 use the same fixed 125 mm visual balance loop. */
+            g_qd4310_test_manual_mode = 0U;
+            g_qd4310_test_position_sequence_enabled = 0U;
+            g_qd4310_test_position_sequence_wait_center_enabled = 0U;
+            g_qd4310_test_position_sequence_phase = 0U;
+            g_qd4310_test_position_sequence_confirm_count = 0U;
+            g_qd4310_test_position_sequence_timer_started = 0U;
+            g_qd4310_test_position_sequence_completed = 0U;
+            g_qd4310_test_target_position_mm =
+                QD4310_TEST_POSITION_SEQUENCE_CENTER_TARGET_MM;
+            g_qd4310_test_motion_authorized = 1U;
+        }
+        if (g_ui_mode == UI_MODE_STATIC_POSITION) {
+            g_ui_start_tick = 0U;
+            g_ui_timer_running = 0U;
+        } else {
+            g_ui_start_tick = osKernelGetTickCount();
+            g_ui_timer_running = 1U;
+        }
         g_ui_elapsed_tenths = 0U;
         g_ui_rendered_tenths = 0U;
         g_ui_run_enabled = 1U;
@@ -150,7 +214,9 @@ void vUiTaskUpdate(void)
         g_ui_dirty = 1U;
     }
 
-    if (g_ui_run_enabled != 0U) {
+    ui_update_static_position_timing();
+
+    if (g_ui_run_enabled != 0U && g_ui_timer_running != 0U) {
         g_ui_elapsed_tenths = ui_elapsed_tenths_now();
         if (g_ui_elapsed_tenths != g_ui_rendered_tenths) {
             g_ui_rendered_tenths = g_ui_elapsed_tenths;
@@ -166,8 +232,17 @@ void vUiTaskUpdate(void)
 void vUiStop(void)
 {
     vQd4310TestRequestStop();
+    g_qd4310_test_position_sequence_enabled = 0U;
+    g_qd4310_test_position_sequence_wait_center_enabled = 0U;
+    g_qd4310_test_position_sequence_phase = 0U;
+    g_qd4310_test_position_sequence_confirm_count = 0U;
+    g_qd4310_test_position_sequence_timer_started = 0U;
+    g_qd4310_test_position_sequence_completed = 0U;
     if (g_ui_run_enabled != 0U) {
-        g_ui_elapsed_tenths = ui_elapsed_tenths_now();
+        if (g_ui_timer_running != 0U) {
+            g_ui_elapsed_tenths = ui_elapsed_tenths_now();
+        }
+        g_ui_timer_running = 0U;
         g_ui_run_enabled = 0U;
         g_ui_rendered_tenths = g_ui_elapsed_tenths;
         g_ui_dirty = 1U;

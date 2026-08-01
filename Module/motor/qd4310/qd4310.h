@@ -26,6 +26,7 @@ typedef enum {
 
 typedef struct {
     bool enabled;
+    uint8_t state_raw;
     uint8_t id;
     float speed_rpm;
     float angle_rad;
