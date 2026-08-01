@@ -10,7 +10,7 @@ extern "C" {
 /* The motor ID must match the QD4310 configuration. */
 #define QD4310_TEST_MOTOR_ID             0U
 #define QD4310_TEST_PERIOD_MS            20U
-#define QD4310_TEST_TARGET_POSITION_MM   75.0f
+#define QD4310_TEST_TARGET_POSITION_MM   125.0f
 #define QD4310_TEST_MIN_ANGLE_DEG        (-10.0f)
 #define QD4310_TEST_MAX_ANGLE_DEG        103.0f
 #define QD4310_TEST_BOOT_ANGLE_DEG       0.0f
