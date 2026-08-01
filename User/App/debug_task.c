@@ -132,7 +132,9 @@ void vDebugTask(void *pvParameters)
         {
             emMode = emDebugModeGrayLineTrack;
         }
-        else if (eUiGetMode() == UI_MODE_LINE_LAP)
+        else if ((eUiGetMode() == UI_MODE_LINE_LAP) ||
+                 (eUiGetMode() == UI_MODE_LAP_CENTER) ||
+                 (eUiGetMode() == UI_MODE_LAP_TARGET))
         {
             emMode = emDebugModeLineRoute;
         }
@@ -165,7 +167,15 @@ void vDebugTask(void *pvParameters)
             }
             else if (emMode == emDebugModeLineRoute)
             {
-                vLineRouteStart();
+                if ((eUiGetMode() == UI_MODE_LAP_CENTER) ||
+                    (eUiGetMode() == UI_MODE_LAP_TARGET))
+                {
+                    vLineRouteExtendedStart();
+                }
+                else
+                {
+                    vLineRouteStart();
+                }
             }
             else if (emMode == emDebugModeAbCurveTest)
             {

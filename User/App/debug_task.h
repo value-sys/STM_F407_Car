@@ -23,7 +23,7 @@ typedef enum
     emDebugModeLineTrackImu,         ///< 灰度位置外环+IMU角速度内环循迹
     emDebugModeCurveLineTrackImu,    ///< 弯道循迹，丢线保持丢线前速度
     emDebugModeGrayLineTrack,        ///< 纯灰度循迹，不使用IMU
-    emDebugModeLineRoute,            ///< ABCD整圈路线状态机
+    emDebugModeLineRoute,            ///< 第2、5、6问共用ABCD整圈路线状态机
     emDebugModeAbCurveTest,          ///< AB直线后进入短弯并定时停车
     emDebugModeCascadeRotate         ///< 位置-速度串级PID旋转测试
 } emDebugModeTdf;

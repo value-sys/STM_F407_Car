@@ -169,6 +169,7 @@
 #define LINE_TRACK_MAX_CORRECTION_OMEGA                 2.2f    /* 底盘循迹角速度限幅，单位rad/s */
 #define LINE_TRACK_LOST_SPEED_SCALE                     0.9f    /* 传统灰度丢线时的速度比例 */
 #define LINE_TRACK_CURVE_ERROR_FILTER_ALPHA             0.45f
+#define LINE_Q2_TRACK_CURVE_FEEDFORWARD_OMEGA_RAD_S     -0.30f /* 第2问弯道右转前馈，单位rad/s */
 
 /* 直线循迹灰度位置外环，输出目标偏航角速度(°/s)。 */
 #define LINE_TRACK_STRAIGHT_GRAY_PID_KP                 30.0f   /* 直线灰度外环比例系数 */
@@ -199,28 +200,67 @@
 #define LINE_TRACK_SENSOR_TURN_SIGN                      1.0f
 #define LINE_TRACK_IMU_TURN_SIGN                         1.0f
 
-/* ============================== ABCD路线状态机参数 ============================== */
+/* 第5/6问独立循迹PID参数，初值与第2问当前值相同，可单独调整。 */
+#define LINE_Q56_TRACK_CORRECTION_KP                     0.90f
+#define LINE_Q56_TRACK_MAX_CORRECTION_OMEGA              0.50f
+#define LINE_Q56_TRACK_CURVE_ERROR_FILTER_ALPHA         0.45f
+#define LINE_Q56_TRACK_CURVE_FEEDFORWARD_OMEGA_RAD_S     0.09f /* 第5/6问弯道右转前馈，单位rad/s */
 
-#define LINE_LAP_STRAIGHT_TARGET_RPM                    155.0f /* AB、CD直线段目标转速 */
-#define LINE_LAP_CURVE_TARGET_RPM                        75.0f /* BC、DA弯道目标转速 */
-#define LINE_LAP_ACCEL_RPM_PER_S                        20.0f /* 弯道切直线时的T型加速度，单位RPM/s */
-#define LINE_LAP_DECEL_RPM_PER_S                        200.0f /* 直线切弯道时的T型减速度，单位RPM/s */
-#define LINE_LAP_START_BLIND_TIME_MS                      100U /* 启动后关闭灰度循迹并直行的时间，单位ms */
-#define LINE_LAP_STRAIGHT_DISTANCE_MM                  1250.0f /* AB、CD直线段切换距离，单位mm */
-#define LINE_LAP_CURVE_ENTRY_DISTANCE_MM               160.0f /* 直线末段进入弯道前的单向修正区间，单位mm */
-#define LINE_LAP_CURVE_ANGLE_DEG                        180.0f /* BC、DA半圆弯道累计转角，单位度 */
-#define LINE_LAP_CURVE_TO_STRAIGHT_CENTER_MASK            0x18U /* D4或D5压黑，允许弯道切换直线 */
-#define LINE_LAP_DA_FINISH_SEARCH_ANGLE_DEG             160.0f /* DA累计到该角度后开始识别停止线 */
-#define LINE_LAP_INTERFERENCE_BLACK_COUNT                  3U    /* 普通循迹时达到该黑色通道数则忽略当前帧 */
-#define LINE_LAP_FINISH_SENSOR_MASK                       0xF0U /* 停止线只使用D5-D8，忽略D1-D4 */
-#define LINE_LAP_FINISH_BLACK_COUNT                       2U    /* 最后停止线至少覆盖相邻的灰度通道数 */
-#define LINE_LAP_FINISH_CONFIRM_CYCLES                    1U    /* 停止线连续确认周期数，1次为10ms */
+#define LINE_Q56_TRACK_STRAIGHT_GRAY_PID_KP             30.0f
+#define LINE_Q56_TRACK_STRAIGHT_GRAY_PID_KI              0.0f
+#define LINE_Q56_TRACK_STRAIGHT_GRAY_PID_KD              0.0f
+#define LINE_Q56_TRACK_CURVE_GRAY_PID_KP                 0.1f
+#define LINE_Q56_TRACK_CURVE_GRAY_PID_KI                 0.0f
+#define LINE_Q56_TRACK_CURVE_GRAY_PID_KD                 0.0f
+#define LINE_Q56_TRACK_STRAIGHT_YAW_RATE_PID_KP          1.25f
+#define LINE_Q56_TRACK_STRAIGHT_YAW_RATE_PID_KI          0.15f
+#define LINE_Q56_TRACK_STRAIGHT_YAW_RATE_PID_KD          0.0f
+#define LINE_Q56_TRACK_CURVE_YAW_RATE_PID_KP              0.0f
+#define LINE_Q56_TRACK_CURVE_YAW_RATE_PID_KI              0.0f
+#define LINE_Q56_TRACK_CURVE_YAW_RATE_PID_KD              0.0f
+#define LINE_Q56_TRACK_STRAIGHT_MAX_TARGET_YAW_RATE      60.0f
+#define LINE_Q56_TRACK_CURVE_MAX_TARGET_YAW_RATE        180.0f
+#define LINE_Q56_TRACK_OUTER_CONTROL_WEIGHT               0.8f
+#define LINE_Q56_TRACK_IMU_FEEDBACK_WEIGHT                1.2f
+
+/* ============================== 第2问整圈路线参数 ============================== */
+
+#define LINE_Q2_STRAIGHT_TARGET_RPM                     155.0f /* AB、CD直线段目标转速 */
+#define LINE_Q2_CURVE_TARGET_RPM                         75.0f /* BC、DA弯道目标转速 */
+#define LINE_Q2_START_ACCEL_RPM_PER_S                   500.0f /* 启动T型加速斜率，单位RPM/s */
+#define LINE_Q2_ACCEL_RPM_PER_S                          20.0f /* 弯道切直线加速度，单位RPM/s */
+#define LINE_Q2_DECEL_RPM_PER_S                         200.0f /* 直线切弯道减速度，单位RPM/s */
+#define LINE_Q2_START_BLIND_TIME_MS                       100U /* 启动后关闭灰度循迹并直行的时间 */
+#define LINE_Q2_STRAIGHT_DISTANCE_MM                   1250.0f /* AB、CD直线段切换距离，单位mm */
+#define LINE_Q2_CURVE_ENTRY_DISTANCE_MM                160.0f /* 直线末段单向修正区间，单位mm */
+#define LINE_Q2_CURVE_ANGLE_DEG                         180.0f /* BC半圆弯道累计转角，单位度 */
+#define LINE_Q2_INTERFERENCE_BLACK_COUNT                   3U    /* 达到该黑色通道数则忽略循迹帧 */
+#define LINE_Q2_DA_FINISH_SEARCH_ANGLE_DEG              160.0f /* DA累计到该角度后识别停止线 */
+#define LINE_Q2_FINISH_SENSOR_MASK                        0xF0U /* 停止线只使用D5-D8 */
+#define LINE_Q2_FINISH_BLACK_COUNT                        2U    /* 停止线至少覆盖相邻通道数 */
+#define LINE_Q2_FINISH_CONFIRM_CYCLES                     1U    /* 停止线连续确认周期数 */
+
+/* ============================== 第5/6问共用整圈路线参数 ============================== */
+
+#define LINE_Q56_STRAIGHT_TARGET_RPM                    90.0f /* AB、CD及最终直线目标转速 */
+#define LINE_Q56_CURVE_TARGET_RPM                        50.0f /* BC、DA弯道目标转速 */
+#define LINE_Q56_START_ACCEL_RPM_PER_S                  100.0f /* 启动T型加速斜率，单位RPM/s */
+#define LINE_Q56_ACCEL_RPM_PER_S                         20.0f /* 弯道切直线加速度，单位RPM/s */
+#define LINE_Q56_DECEL_RPM_PER_S                        200.0f /* 直线切弯道减速度，单位RPM/s */
+#define LINE_Q56_START_BLIND_TIME_MS                       0U /* 0表示启动后立即进入灰度循迹 */
+#define LINE_Q56_STRAIGHT_DISTANCE_MM                  1325.0f /* AB、CD直线段切换距离，单位mm */
+#define LINE_Q56_CURVE_ENTRY_DISTANCE_MM               200.0f /* 直线末段单向修正区间，单位mm */
+#define LINE_Q56_CURVE_ANGLE_DEG                        180.0f /* BC、DA弯道切换角度，单位度 */
+#define LINE_Q56_INTERFERENCE_BLACK_COUNT                  3U    /* 达到该黑色通道数则忽略循迹帧 */
+#define LINE_Q56_FINAL_STRAIGHT_TIME_MS                 500U /* 最后弯道转直线后的运行时间 */
 
 /* AB直线后切换弯道循迹并定时停车，参数与整圈状态机独立。 */
 #define LINE_AB_CURVE_STRAIGHT_TARGET_RPM               80.0f /* AB直线段目标转速 */
 #define LINE_AB_CURVE_CURVE_TARGET_RPM                  45.0f /* B点后弯道目标转速 */
+#define LINE_AB_CURVE_START_ACCEL_RPM_PER_S            500.0f /* 启动T型加速斜率，单位RPM/s */
 #define LINE_AB_CURVE_ACCEL_RPM_PER_S                  100.0f /* 独立T型加速度，单位RPM/s */
 #define LINE_AB_CURVE_DECEL_RPM_PER_S                  100.0f /* 独立T型减速度，单位RPM/s */
+#define LINE_AB_CURVE_START_BLIND_TIME_MS                20U /* 启动后关闭灰度循迹并直行的时间 */
 #define LINE_AB_CURVE_STRAIGHT_DISTANCE_MM            1300.0f /* A到B切换距离，单位mm */
 #define LINE_AB_CURVE_RUN_TIME_MS                      500U   /* 弯道循迹持续时间，单位ms */
 #define LINE_AB_CURVE_INTERFERENCE_BLACK_COUNT            3U    /* 达到该黑色通道数则忽略当前循迹帧 */
