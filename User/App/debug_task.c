@@ -125,6 +125,16 @@ void vDebugTask(void *pvParameters)
             (void)osDelayUntil(ulWakeTick);
             continue;
         }
+        if (ucUiChassisStartAllowed() == 0U)
+        {
+            /* QD4310初始化等待期间，底盘明确保持停止。 */
+            g_emDebugMode = emDebugModeNone;
+            vDebugModeExit();
+            emLastMode = emDebugModeNone;
+            ulWakeTick += MOTOR_SAMPLE_TIME;
+            (void)osDelayUntil(ulWakeTick);
+            continue;
+        }
 
         /* KEY1启动OLED当前选择的测试模式。 */
         emDebugModeTdf emMode;
@@ -133,6 +143,10 @@ void vDebugTask(void *pvParameters)
                  (eUiGetMode() == UI_MODE_LAP_TARGET))
         {
             emMode = emDebugModeLineRoute;
+        }
+        else if (eUiGetMode() == UI_MODE_AB_CENTER)
+        {
+            emMode = emDebugModeAbCurveTest;
         }
         else
         {
@@ -168,6 +182,10 @@ void vDebugTask(void *pvParameters)
                 {
                     vLineRouteStart();
                 }
+            }
+            else if (emMode == emDebugModeAbCurveTest)
+            {
+                vLineAbCurveStart();
             }
             emLastMode = emMode;
         }

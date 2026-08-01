@@ -21,7 +21,9 @@ typedef enum
 void vUiInit(void);
 void vUiTaskUpdate(void);
 void vUiStop(void);
+void vUiFinishRun(void);
 uint8_t ucUiRunEnabled(void);
+uint8_t ucUiChassisStartAllowed(void);
 eUiModeTdf eUiGetMode(void);
 uint32_t ulUiElapsedTenths(void);
 
