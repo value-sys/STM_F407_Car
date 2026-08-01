@@ -71,12 +71,27 @@ typedef struct
     stLineTrackRunningParamTdf stRunningParam;
 } stLineTrackDeviceParamTdf;
 
+typedef enum
+{
+    emLineTrackRouteProfileQ2 = 0U,
+    emLineTrackRouteProfileQ56
+} emLineTrackRouteProfileTdf;
+
 const stLineTrackDeviceParamTdf *c_pstGetLineTrackDeviceParam(void);
 void vLineTrackDeviceInit(const stLineTrackStaticParamTdf *pstInit);
 void vLineTrackStart(void);
 void vLineTrackStop(void);
+/** @brief 选择路线对应的循迹PID和灰度权重配置。 */
+void vLineTrackSelectRouteProfile(emLineTrackRouteProfileTdf emProfile);
+/**
+  * @brief  设置直线末段的弯道入口约束
+  * @param  ucEnable 非0时D1-D4权重为0，且不允许底盘向左转
+  */
+void vLineTrackSetCurveEntryConstraint(uint8_t ucEnable);
 void vLineTrackUpdate(void);
 void vLineTrackUpdateByTargetRpm(float fTargetRpm);
+/// @brief 纯灰度弯道循迹，丢线时按上一次方向保持速度搜索
+void vLineTrackCurveUpdateByTargetRpm(float fTargetRpm);
 void vLineTrackImuUpdateByTargetRpm(float fTargetRpm);
 /// @brief      灰度+IMU弯道循迹，丢线后保持丢线前的有效线速度
 void vLineTrackCurveImuUpdateByTargetRpm(float fTargetRpm);

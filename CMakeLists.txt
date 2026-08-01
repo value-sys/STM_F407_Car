@@ -57,6 +57,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     User/Device/GrayscaleSensor.c
     User/Device/line_track.c
     User/Device/line_route.c
+    User/Device/line_ab_curve_test.c
     User/Device/imu.c
     User/App/app_init.c
     User/App/debug_task.c

@@ -22,6 +22,7 @@
 #include "debug_task.h"
 #include "grayscale_task.h"
 #include "imu_task.h"
+#include "line_ab_curve_test.h"
 #include "line_route.h"
 #include "line_track.h"
 #include "motor_control.h"
@@ -64,7 +65,8 @@ volatile const char *g_pcStackOverflowTaskName;
 osThreadId_t defaultTaskHandle;
 const osThreadAttr_t defaultTask_attributes = {
   .name = "defaultTask",
-  .stack_size = 256 * 4,
+  /* StartDefaultTask同时执行循迹状态机、IMU/灰度融合和底盘运动学。 */
+  .stack_size = CHASSIS_TASK_STACK_WORDS * sizeof(StackType_t),
   .priority = (osPriority_t) osPriorityNormal,
 };
 /* Definitions for MotorTest_Task */
@@ -215,6 +217,7 @@ void StartDefaultTask(void *argument)
         (g_emDebugMode == emDebugModeCurveLineTrackImu) ||
         (g_emDebugMode == emDebugModeGrayLineTrack) ||
         (g_emDebugMode == emDebugModeLineRoute) ||
+        (g_emDebugMode == emDebugModeAbCurveTest) ||
         (g_emDebugMode == emDebugModeCascadeRotate))
     {
       if (emChassisImuRotateGetState() == emChassisImuRotateRunning)
@@ -239,8 +242,21 @@ void StartDefaultTask(void *argument)
       }
       else if (g_emDebugMode == emDebugModeLineRoute)
       {
-        /* ABCD路线状态机：直线用灰度+IMU，弯道用纯灰度。 */
+        /* 第2/5/6问共用路线：直线用灰度+IMU，弯道用纯灰度。 */
         vLineRouteUpdate();
+        if (emLineRouteGetState() == emLineRouteStopped)
+        {
+          vUiStop();
+        }
+      }
+      else if (g_emDebugMode == emDebugModeAbCurveTest)
+      {
+        /* AB直线后切换弯道循迹，并按独立时长停车。 */
+        vLineAbCurveUpdate();
+        if (emLineAbCurveGetState() == emLineAbCurveStopped)
+        {
+          vUiStop();
+        }
       }
 
       vChassisUpdate();

@@ -68,6 +68,7 @@ void vVofaTask(void *pvParameters)
         else if ((g_emDebugMode == emDebugModeGrayscale) ||
                  (g_emDebugMode == emDebugModeGrayLineTrack) ||
                  (g_emDebugMode == emDebugModeLineTrackImu) ||
+                 (g_emDebugMode == emDebugModeAbCurveTest) ||
                  (g_emDebugMode == emDebugModeLineRoute))
         {
             vVofaSendGrayscaleInfo();
