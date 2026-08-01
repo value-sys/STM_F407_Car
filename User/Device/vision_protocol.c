@@ -110,8 +110,8 @@ uint8_t ucVisionParserInput(stVisionParser *parser,
     position = (int16_t)((uint16_t)parser->frame[7] |
                          ((uint16_t)parser->frame[8] << 8U));
     if (parser->frame[9] > 1U || parser->frame[10] > 100U ||
-        position < VISION_POSITION_MIN_01MM ||
-        position > VISION_POSITION_MAX_01MM)
+        position < VISION_POSITION_MIN_MM ||
+        position > VISION_POSITION_MAX_MM)
     {
         ++parser->format_error_count;
         vVisionParserReset(parser);
@@ -120,7 +120,7 @@ uint8_t ucVisionParserInput(stVisionParser *parser,
 
     output->sequence = (uint16_t)parser->frame[5] |
                        ((uint16_t)parser->frame[6] << 8U);
-    output->ball_position_01mm = position;
+    output->ball_position_mm = position;
     output->valid = parser->frame[9];
     output->confidence = parser->frame[10];
     output->timestamp_ms = (uint32_t)parser->frame[11] |

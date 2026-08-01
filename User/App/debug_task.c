@@ -128,19 +128,11 @@ void vDebugTask(void *pvParameters)
 
         /* KEY1启动OLED当前选择的测试模式。 */
         emDebugModeTdf emMode;
-        if (eUiGetMode() == UI_MODE_GRAY_TRACK_TEST)
-        {
-            emMode = emDebugModeGrayLineTrack;
-        }
-        else if ((eUiGetMode() == UI_MODE_LINE_LAP) ||
+        if ((eUiGetMode() == UI_MODE_LINE_LAP) ||
                  (eUiGetMode() == UI_MODE_LAP_CENTER) ||
                  (eUiGetMode() == UI_MODE_LAP_TARGET))
         {
             emMode = emDebugModeLineRoute;
-        }
-        else if (eUiGetMode() == UI_MODE_AB_CURVE_TEST)
-        {
-            emMode = emDebugModeAbCurveTest;
         }
         else
         {
@@ -176,10 +168,6 @@ void vDebugTask(void *pvParameters)
                 {
                     vLineRouteStart();
                 }
-            }
-            else if (emMode == emDebugModeAbCurveTest)
-            {
-                vLineAbCurveStart();
             }
             emLastMode = emMode;
         }

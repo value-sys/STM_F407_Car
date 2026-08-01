@@ -14,10 +14,11 @@ static stVisionParser g_vision_parser;
 static volatile stVisionBallData g_vision_pending_data;
 static volatile uint8_t g_vision_pending;
 static stVisionBallData g_vision_latest_data;
+static uint32_t g_vision_receive_count;
 static uint8_t g_vision_have_sequence;
 static uint16_t g_vision_last_sequence;
 static uint8_t g_vision_have_position;
-static int16_t g_vision_last_position_01mm;
+static int16_t g_vision_last_position_mm;
 static uint32_t g_vision_last_position_tick_ms;
 static uint32_t g_vision_last_valid_tick_ms;
 static float g_vision_ball_speed_mm_per_s;
@@ -33,6 +34,7 @@ volatile uint8_t g_vision_debug_confidence;
 volatile uint16_t g_vision_debug_sequence;
 volatile uint32_t g_vision_debug_timestamp_ms;
 volatile uint32_t g_vision_debug_receive_tick_ms;
+volatile uint32_t g_vision_debug_receive_count;
 volatile uint32_t g_vision_debug_frame_ok_count;
 volatile uint32_t g_vision_debug_crc_error_count;
 volatile uint32_t g_vision_debug_format_error_count;
@@ -44,6 +46,7 @@ static void vVisionStoreParsedData(const stVisionBallData *data)
 {
     stVisionBallData copy = *data;
     copy.receive_tick_ms = HAL_GetTick();
+    copy.receive_count = ++g_vision_receive_count;
     g_vision_pending_data = copy;
     g_vision_pending = 1U;
 }
@@ -90,6 +93,7 @@ void vVisionInit(void)
     vVisionParserInit(&g_vision_parser);
     g_vision_dma_last_position = 0U;
     g_vision_pending = 0U;
+    g_vision_receive_count = 0U;
     g_vision_have_sequence = 0U;
     g_vision_have_position = 0U;
     g_vision_ball_speed_mm_per_s = 0.0f;
@@ -105,6 +109,7 @@ void vVisionInit(void)
     g_vision_debug_sequence = 0U;
     g_vision_debug_timestamp_ms = 0U;
     g_vision_debug_receive_tick_ms = 0U;
+    g_vision_debug_receive_count = 0U;
     g_vision_debug_frame_ok_count = 0U;
     g_vision_debug_crc_error_count = 0U;
     g_vision_debug_format_error_count = 0U;
@@ -150,28 +155,28 @@ void vVisionTaskUpdate(void)
     }
     __enable_irq();
 
-    if (has_data != 0U &&
-        (g_vision_have_sequence == 0U ||
-         data.sequence != g_vision_last_sequence))
+    if (has_data != 0U)
     {
         g_vision_latest_data = data;
         g_vision_last_sequence = data.sequence;
         g_vision_have_sequence = 1U;
 
-        g_vision_debug_position_01mm = data.ball_position_01mm;
+        /* Keep the legacy raw diagnostic name for Ozone compatibility. */
+        g_vision_debug_position_01mm = data.ball_position_mm;
         g_vision_debug_position_mm =
-            (float)data.ball_position_01mm * 0.1f;
+            (float)data.ball_position_mm;
         g_vision_debug_valid = data.valid;
         g_vision_debug_confidence = data.confidence;
         g_vision_debug_sequence = data.sequence;
         g_vision_debug_timestamp_ms = data.timestamp_ms;
         g_vision_debug_receive_tick_ms = data.receive_tick_ms;
+        g_vision_debug_receive_count = data.receive_count;
 
         if (data.valid != 0U &&
             data.confidence >= VISION_CONFIDENCE_MIN)
         {
             const float position_mm =
-                (float)data.ball_position_01mm * 0.1f;
+                (float)data.ball_position_mm;
             const uint32_t sample_tick = data.receive_tick_ms;
             const uint32_t dt = sample_tick -
                                 g_vision_last_position_tick_ms;
@@ -179,7 +184,7 @@ void vVisionTaskUpdate(void)
             if (g_vision_have_position != 0U && dt > 0U)
             {
                 const float last_mm =
-                    (float)g_vision_last_position_01mm * 0.1f;
+                    (float)g_vision_last_position_mm;
                 const float raw_speed =
                     (position_mm - last_mm) * 1000.0f / (float)dt;
 
@@ -188,7 +193,7 @@ void vVisionTaskUpdate(void)
                     0.3f * raw_speed;
             }
 
-            g_vision_last_position_01mm = data.ball_position_01mm;
+            g_vision_last_position_mm = data.ball_position_mm;
             g_vision_last_position_tick_ms = sample_tick;
             g_vision_have_position = 1U;
             ++g_vision_valid_frame_count;

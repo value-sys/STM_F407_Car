@@ -58,6 +58,61 @@ void qd4310_init(qd4310_t *motor, UART_HandleTypeDef *huart, uint8_t id)
     motor->id = id;
 }
 
+static uint8_t qd4310_build_frame(const qd4310_t *motor,
+                                  qd4310_command_t cmd,
+                                  int16_t value,
+                                  uint8_t frame[5])
+{
+    if (motor == NULL || frame == NULL) {
+        return 0U;
+    }
+
+    frame[0] = motor->id;
+    frame[1] = (uint8_t)cmd;
+    frame[2] = (uint8_t)(value & 0xFF);
+    frame[3] = (uint8_t)((uint16_t)value >> 8);
+    frame[4] = qd4310_crc8(frame, 4U, 0x07U, 0x00U, 0x00U, false, false);
+    return 1U;
+}
+
+static void qd4310_discard_pending_rx(UART_HandleTypeDef *huart)
+{
+    if (huart == NULL) {
+        return;
+    }
+
+    while (__HAL_UART_GET_FLAG(huart, UART_FLAG_RXNE) != RESET) {
+        (void)huart->Instance->DR;
+    }
+
+    if (__HAL_UART_GET_FLAG(huart, UART_FLAG_ORE) != RESET) {
+        __HAL_UART_CLEAR_OREFLAG(huart);
+    }
+}
+
+HAL_StatusTypeDef qd4310_send_only(qd4310_t *motor,
+                                   qd4310_command_t cmd,
+                                   int16_t value)
+{
+    uint8_t tx_buffer[5];
+    HAL_StatusTypeDef status;
+
+    if (motor == NULL || motor->huart == NULL ||
+        qd4310_build_frame(motor, cmd, value, tx_buffer) == 0U) {
+        return HAL_ERROR;
+    }
+
+    /* The motor may still return a feedback frame. Discard old bytes so the
+     * send-only path does not leave USART2 in an overrun state. */
+    qd4310_discard_pending_rx(motor->huart);
+    memcpy(motor->last_tx_frame, tx_buffer, sizeof(tx_buffer));
+    status = HAL_UART_Transmit(motor->huart, tx_buffer, sizeof(tx_buffer), 20U);
+    if (status == HAL_OK) {
+        ++motor->tx_count;
+    }
+    return status;
+}
+
 HAL_StatusTypeDef qd4310_send_raw(qd4310_t *motor, qd4310_command_t cmd, int16_t value)
 {
     uint8_t tx_buffer[5];
@@ -68,16 +123,16 @@ HAL_StatusTypeDef qd4310_send_raw(qd4310_t *motor, qd4310_command_t cmd, int16_t
         return HAL_ERROR;
     }
 
-    tx_buffer[0] = motor->id;
-    tx_buffer[1] = (uint8_t)cmd;
-    tx_buffer[2] = (uint8_t)(value & 0xFF);
-    tx_buffer[3] = (uint8_t)((uint16_t)value >> 8);
-    tx_buffer[4] = qd4310_crc8(tx_buffer, 4, 0x07, 0x00, 0x00, false, false);
+    if (qd4310_build_frame(motor, cmd, value, tx_buffer) == 0U) {
+        return HAL_ERROR;
+    }
+    memcpy(motor->last_tx_frame, tx_buffer, sizeof(tx_buffer));
 
     status = HAL_UART_Transmit(motor->huart, tx_buffer, sizeof(tx_buffer), HAL_MAX_DELAY);
     if (status != HAL_OK) {
         return status;
     }
+    ++motor->tx_count;
 
     status = HAL_UART_Receive(motor->huart, rx_buffer, sizeof(rx_buffer), 5);
     if (status != HAL_OK) {
@@ -107,6 +162,7 @@ void qd4310_update(qd4310_t *motor, const uint8_t feedback[8])
     }
 
     motor->enabled = (feedback[0] & 0x01u) != 0u;
+    motor->state_raw = feedback[0];
 
     current_raw = (int16_t)(((uint16_t)feedback[3] << 8) | feedback[2]);
     speed_raw = (int16_t)(((uint16_t)feedback[5] << 8) | feedback[4]);
@@ -143,6 +199,40 @@ HAL_StatusTypeDef qd4310_set_angle(qd4310_t *motor, float angle_rad)
     angle_rad = qd4310_clamp(angle_rad, 0.0f, QD4310_TWO_PI);
     raw = (uint16_t)((angle_rad / QD4310_TWO_PI) * 65535.0f);
     return qd4310_send_raw(motor, QD4310_CMD_ANGLE, (int16_t)raw);
+}
+
+HAL_StatusTypeDef qd4310_set_angle_only(qd4310_t *motor, float angle_rad)
+{
+    uint16_t raw;
+
+    angle_rad = qd4310_clamp(angle_rad, 0.0f, QD4310_TWO_PI);
+    raw = (uint16_t)((angle_rad / QD4310_TWO_PI) * 65535.0f);
+    return qd4310_send_only(motor, QD4310_CMD_ANGLE, (int16_t)raw);
+}
+
+HAL_StatusTypeDef qd4310_set_step_angle_only(qd4310_t *motor,
+                                             float step_angle_rad)
+{
+    int16_t raw;
+
+    step_angle_rad = qd4310_clamp(step_angle_rad,
+                                  QD4310_MIN_STEP_ANGLE_RAD,
+                                  QD4310_MAX_STEP_ANGLE_RAD);
+    raw = (int16_t)((step_angle_rad / QD4310_MAX_STEP_ANGLE_RAD) *
+                    (float)INT16_MAX);
+    return qd4310_send_only(motor, QD4310_CMD_STEP_ANGLE, raw);
+}
+
+HAL_StatusTypeDef qd4310_set_speed_only(qd4310_t *motor, float speed_rpm)
+{
+    int16_t raw;
+
+    speed_rpm = qd4310_clamp(speed_rpm,
+                             QD4310_MIN_SPEED_RPM,
+                             QD4310_MAX_SPEED_RPM);
+    raw = (int16_t)((speed_rpm / QD4310_MAX_SPEED_RPM) *
+                    (float)INT16_MAX);
+    return qd4310_send_only(motor, QD4310_CMD_SPEED, raw);
 }
 
 HAL_StatusTypeDef qd4310_set_step_angle(qd4310_t *motor, float step_angle_rad)
