@@ -271,6 +271,7 @@ void vUiTaskUpdate(void)
         if (g_ui_mode == UI_MODE_STATIC_POSITION) {
             /* Static-position mode owns the QD4310 run request. */
             g_qd4310_test_manual_mode = 0U;
+            g_qd4310_test_deadband_mm = QD4310_TEST_DEADBAND_MM;
             g_qd4310_test_initial_angle_deg = QD4310_TEST_INITIAL_ANGLE_DEG;
             g_qd4310_test_position_sequence_phase = 0U;
             g_qd4310_test_position_sequence_confirm_count = 0U;
@@ -283,6 +284,7 @@ void vUiTaskUpdate(void)
         if (ui_mode_is_center_hold() != 0U) {
             /* Modes 4 and 5 use the same fixed 125 mm visual balance loop. */
             g_qd4310_test_manual_mode = 0U;
+            g_qd4310_test_deadband_mm = QD4310_TEST_CENTER_DEADBAND_MM;
             g_qd4310_test_position_sequence_enabled = 0U;
             g_qd4310_test_position_sequence_wait_center_enabled = 0U;
             g_qd4310_test_position_sequence_phase = 0U;
@@ -296,6 +298,7 @@ void vUiTaskUpdate(void)
         if (g_ui_mode == UI_MODE_LAP_TARGET) {
             /* The selected target is controlled by the vision balance loop. */
             g_qd4310_test_manual_mode = 0U;
+            g_qd4310_test_deadband_mm = QD4310_TEST_CENTER_DEADBAND_MM;
             g_qd4310_test_position_sequence_enabled = 0U;
             g_qd4310_test_position_sequence_wait_center_enabled = 0U;
             g_qd4310_test_position_sequence_phase = 0U;
